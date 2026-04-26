@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Street Dice Async</title>
+  <style>
+    :root { color-scheme: dark; }
+    body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:#0a0a0a; color:#f2f2f2; }
+    .app { max-width: 900px; margin: 0 auto; padding: 20px; }
+    .card { background:#141414; border:1px solid #2a2a2a; border-radius:14px; padding:16px; margin-bottom:14px; }
+    h1,h2,h3 { margin: 0 0 10px; }
+    .row { display:flex; gap:10px; flex-wrap:wrap; }
+    button, input, select { border-radius:10px; border:1px solid #3a3a3a; background:#1f1f1f; color:#f2f2f2; padding:10px 12px; font-size:14px; }
+    button { cursor:pointer; }
+    button.primary { background:#14532d; border-color:#15803d; }
+    button.warn { background:#7c2d12; border-color:#ea580c; }
+    input { min-width: 180px; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; word-break: break-all; }
+    .pill { display:inline-block; background:#222; border:1px solid #333; padding:4px 8px; border-radius:999px; margin-right:8px; margin-bottom:6px; }
+    .dice { font-size:24px; letter-spacing: 4px; }
+    .muted { color:#b7b7b7; }
+    ul { margin:8px 0; }
+    .winner { color:#86efac; font-weight:700; }
+    a { color:#93c5fd; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <h1>Street Dice Async</h1>
+    <p class="muted">Single-file, no backend. State is encoded in URL hash. Roll, then share the link.</p>
+
+    <div id="setup" class="card"></div>
+    <div id="game" class="card" style="display:none"></div>
+    <div id="share" class="card" style="display:none"></div>
+    <div id="log" class="card" style="display:none"></div>
+  </div>
+
+<script>
+(() => {
+  const faces = ['⚀','⚁','⚂','⚃','⚄','⚅'];
+  const $ = (id) => document.getElementById(id);
+
+  const DEFAULT = {
+    mode: 'craps',
+    players: ['Player 1','Player 2'],
+    current: 0,
+    gameOver: false,
+    winner: null,
+    log: [],
+    craps: { roundsToWin: 3, wins:[0,0], phase:'comeout', point:null, shooter:0 },
+    clo: { done:[false,false], result:[null,null], winner:null },
+    tenk: { scores:[0,0], banked:[false,false], turnScore:0, remaining:[1,2,3,4,5,6], canContinue:false }
+  };
+
+  function clone(obj){ return JSON.parse(JSON.stringify(obj)); }
+
+  function roll(n){
+    return Array.from({length:n},()=>1+Math.floor(Math.random()*6));
+  }
+
+  function addLog(s,msg){
+    s.log.unshift(`${new Date().toLocaleString()} — ${msg}`);
+    s.log = s.log.slice(0,80);
+  }
+
+  function encodeState(state){
+    return btoa(unescape(encodeURIComponent(JSON.stringify(state))))
+      .replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+  }
+
+  function decodeState(hash){
+    if(!hash) return null;
+    try{
+      const b64 = hash.replace(/^#/,'').replace(/-/g,'+').replace(/_/g,'/');
+      const pad = '='.repeat((4 - b64.length % 4) % 4);
+      return JSON.parse(decodeURIComponent(escape(atob(b64 + pad))));
+    }catch{ return null; }
+  }
+
+  function scoreClo(d){
+    const a=[...d].sort((x,y)=>x-y);
+    const key=a.join('-');
+    if(key==='1-2-3') return {rank:0,label:'1-2-3 auto-loss'};
+    if(key==='4-5-6') return {rank:1000,label:'4-5-6 auto-win'};
+    if(a[0]===a[2]) return {rank:900+a[0],label:`Triple ${a[0]}s`};
+    if(a[0]===a[1]||a[1]===a[2]){
+      const odd = a[0]===a[1] ? a[2] : a[0];
+      return {rank:100+odd,label:`Point ${odd}`};
+    }
+    return null;
+  }
+
+  function scoreSetFarkle(dice){
+    const cnt = Array(7).fill(0);
+    dice.forEach(v=>cnt[v]++);
+    const values = [1,2,3,4,5,6];
+
+    if(dice.length===6){
+      const sorted=[...dice].sort((a,b)=>a-b).join('');
+      if(sorted==='123456') return {score:1500, used:6, desc:'Straight 1-6'};
+      if(values.filter(v=>cnt[v]===2).length===3) return {score:1000, used:6, desc:'Three pairs'};
+    }
+
+    let score=0, used=0, parts=[];
+    values.forEach(v=>{
+      if(cnt[v]>=3){
+        let base = v===1?1000:v*100;
+        if(cnt[v]===4) base*=2;
+        else if(cnt[v]===5) base*=4;
+        else if(cnt[v]===6) base*=8;
+        score += base;
+        used += cnt[v];
+        parts.push(`${cnt[v]}x${v}`);
+        cnt[v]=0;
+      }
+    });
+
+    if(cnt[1]>0){ score += cnt[1]*100; used += cnt[1]; parts.push(`${cnt[1]}x1`); }
+    if(cnt[5]>0){ score += cnt[5]*50; used += cnt[5]; parts.push(`${cnt[5]}x5`); }
+
+    return score>0 ? {score, used, desc:parts.join(', ')} : null;
+  }
+
+  let state = decodeState(location.hash) || clone(DEFAULT);
+
+  function save(){
+    location.hash = encodeState(state);
+    render();
+  }
+
+  function newGame(){
+    const p1 = (document.getElementById('p1')?.value || 'Player 1').trim() || 'Player 1';
+    const p2 = (document.getElementById('p2')?.value || 'Player 2').trim() || 'Player 2';
+    const mode = document.getElementById('mode')?.value || 'craps';
+    state = clone(DEFAULT);
+    state.mode = mode;
+    state.players = [p1,p2];
+    addLog(state, `New ${mode.toUpperCase()} game started.`);
+    save();
+  }
+
+  function endTurn(){
+    state.current = state.current===0 ? 1 : 0;
+  }
+
+  function takeCrapsRoll(){
+    if(state.gameOver) return;
+    const d = roll(2), sum = d[0]+d[1], c=state.craps;
+    addLog(state, `${state.players[state.current]} rolled ${d.join('+')}=${sum}.`);
+    if(c.phase==='comeout'){
+      if(sum===7||sum===11){ c.wins[state.current]++; addLog(state, 'Natural! Shooter wins sequence.'); endTurn(); }
+      else if(sum===2||sum===3||sum===12){ addLog(state, 'Craps out. Shooter loses sequence.'); endTurn(); }
+      else { c.phase='point'; c.point=sum; addLog(state, `Point set to ${sum}.`); return save(); }
+    } else {
+      if(sum===c.point){ c.wins[state.current]++; addLog(state, `Made point ${c.point}. Shooter wins sequence.`); endTurn(); c.phase='comeout'; c.point=null; }
+      else if(sum===7){ addLog(state, 'Seven-out. Shooter loses sequence.'); endTurn(); c.phase='comeout'; c.point=null; }
+      else { addLog(state, 'No decision, roll again.'); return save(); }
+    }
+
+    if(c.wins[0]>=c.roundsToWin || c.wins[1]>=c.roundsToWin){
+      state.gameOver=true;
+      state.winner = c.wins[0]>c.wins[1] ? 0 : 1;
+      addLog(state, `${state.players[state.winner]} wins Craps ${c.wins[0]}-${c.wins[1]}.`);
+    }
+    save();
+  }
+
+  function takeCloTurn(){
+    if(state.gameOver) return;
+    const r = state.clo;
+    if(r.done[state.current]) return;
+    while(true){
+      const d=roll(3), s=scoreClo(d);
+      addLog(state, `${state.players[state.current]} rolled ${d.join('-')}.`);
+      if(!s){ addLog(state, 'No scoring combo, re-roll.'); continue; }
+      r.done[state.current]=true;
+      r.result[state.current]=s;
+      addLog(state, `${state.players[state.current]} score: ${s.label}.`);
+      break;
+    }
+
+    if(r.done[0] && r.done[1]){
+      const a=r.result[0].rank, b=r.result[1].rank;
+      if(a===b){ state.gameOver=true; state.winner=null; addLog(state, 'Tie game.'); }
+      else { state.gameOver=true; state.winner=a>b?0:1; addLog(state, `${state.players[state.winner]} wins.`); }
+    } else {
+      endTurn();
+    }
+    save();
+  }
+
+  function rollTenk(){
+    if(state.gameOver) return;
+    const t=state.tenk;
+    const dice = roll(t.remaining.length);
+    const scored = scoreSetFarkle(dice);
+    addLog(state, `${state.players[state.current]} rolled [${dice.join(', ')}].`);
+
+    if(!scored){
+      addLog(state, `Farkle! ${state.players[state.current]} loses ${t.turnScore} turn points.`);
+      t.turnScore=0; t.remaining=[1,2,3,4,5,6]; t.canContinue=false;
+      endTurn();
+      return save();
+    }
+
+    t.turnScore += scored.score;
+    const remain = dice.length - scored.used;
+    addLog(state, `Scored ${scored.score} (${scored.desc}). Turn total ${t.turnScore}.`);
+    if(remain===0){
+      addLog(state, 'Hot dice! Roll all 6 again.');
+      t.remaining=[1,2,3,4,5,6];
+    } else {
+      t.remaining = Array.from({length:remain}, (_,i)=>i+1);
+    }
+    t.canContinue=true;
+    save();
+  }
+
+  function bankTenk(){
+    const t=state.tenk, p=state.current;
+    if(!t.canContinue || t.turnScore===0) return;
+    if(!t.banked[p] && t.turnScore<1000){
+      addLog(state, `${state.players[p]} needs 1000 in one turn to get on board.`);
+      return save();
+    }
+
+    t.scores[p]+=t.turnScore;
+    t.banked[p]=true;
+    addLog(state, `${state.players[p]} banks ${t.turnScore}. Total ${t.scores[p]}.`);
+    t.turnScore=0; t.remaining=[1,2,3,4,5,6]; t.canContinue=false;
+
+    if(t.scores[p] >= 10000){
+      state.gameOver=true; state.winner=p;
+      addLog(state, `${state.players[p]} wins 10,000.`);
+    } else endTurn();
+    save();
+  }
+
+  function renderSetup(){
+    $('setup').innerHTML = `
+      <h2>Setup</h2>
+      <div class="row">
+        <input id="p1" placeholder="Player 1" value="${state.players[0]||'Player 1'}" />
+        <input id="p2" placeholder="Player 2" value="${state.players[1]||'Player 2'}" />
+        <select id="mode">
+          <option value="craps" ${state.mode==='craps'?'selected':''}>Street Craps</option>
+          <option value="clo" ${state.mode==='clo'?'selected':''}>C-Lo</option>
+          <option value="456" ${state.mode==='456'?'selected':''}>4-5-6</option>
+          <option value="10000" ${state.mode==='10000'?'selected':''}>10,000 (Farkle)</option>
+        </select>
+        <button class="primary" id="newGameBtn">New / Reset Game</button>
+      </div>
+      <p class="muted">Rules are locked to your spec. C-Lo and 4-5-6 use the same head-to-head scoring.</p>
+    `;
+    $('newGameBtn').onclick = newGame;
+  }
+
+  function renderGame(){
+    $('game').style.display='block';
+    const p = state.players[state.current];
+    let html = `<h2>${state.mode==='456'?'4-5-6':state.mode.toUpperCase()}</h2>`;
+    html += `<div><span class="pill">Turn: ${p}</span>`;
+    if(state.gameOver) html += `<span class="pill winner">${state.winner===null?'Tie':`Winner: ${state.players[state.winner]}`}</span>`;
+    html += `</div>`;
+
+    if(state.mode==='craps'){
+      const c=state.craps;
+      html += `<p>${state.players[0]} ${c.wins[0]} - ${c.wins[1]} ${state.players[1]} (first to ${c.roundsToWin})</p>`;
+      html += `<p>Phase: ${c.phase}${c.point?` | Point: ${c.point}`:''}</p>`;
+      html += `<button class="primary" id="act" ${state.gameOver?'disabled':''}>Roll 2 Dice</button>`;
+    } else if(state.mode==='clo' || state.mode==='456'){
+      const r=state.clo;
+      html += `<p>Best of 1 head-to-head.</p>`;
+      html += `<ul>
+        <li>${state.players[0]}: ${r.result[0]?r.result[0].label:'Pending'}</li>
+        <li>${state.players[1]}: ${r.result[1]?r.result[1].label:'Pending'}</li>
+      </ul>`;
+      html += `<button class="primary" id="act" ${state.gameOver?'disabled':''}>Take Turn (auto re-roll until score)</button>`;
+    } else {
+      const t=state.tenk;
+      html += `<p>${state.players[0]} ${t.scores[0]} - ${t.scores[1]} ${state.players[1]} (first to 10000)</p>`;
+      html += `<p>Turn points: ${t.turnScore} | Dice to roll: ${t.remaining.length}</p>`;
+      html += `<button class="primary" id="act" ${state.gameOver?'disabled':''}>Roll Dice</button>
+               <button id="bank" ${(!t.canContinue||state.gameOver)?'disabled':''}>Bank & Pass</button>`;
+    }
+    $('game').innerHTML = html;
+    const act = $('act');
+    if(act){
+      if(state.mode==='craps') act.onclick=takeCrapsRoll;
+      else if(state.mode==='clo'||state.mode==='456') act.onclick=takeCloTurn;
+      else act.onclick=rollTenk;
+    }
+    const bank = $('bank'); if(bank) bank.onclick=bankTenk;
+  }
+
+  function renderShare(){
+    $('share').style.display='block';
+    const link = location.href;
+    $('share').innerHTML = `
+      <h3>Share URL</h3>
+      <p class="mono">${link}</p>
+      <div class="row">
+        <button id="copyLink">Copy Link</button>
+      </div>
+      <p class="muted">Whoever acts next should open this exact link, make their move, and share the new URL back.</p>
+    `;
+    $('copyLink').onclick = async () => {
+      try { await navigator.clipboard.writeText(link); alert('Copied'); }
+      catch { alert('Copy failed. Manual copy from URL bar.'); }
+    };
+  }
+
+  function renderLog(){
+    $('log').style.display='block';
+    $('log').innerHTML = `<h3>Game Log</h3><ul>${state.log.map(x=>`<li>${x}</li>`).join('')}</ul>`;
+  }
+
+  function render(){
+    renderSetup();
+    renderGame();
+    renderShare();
+    renderLog();
+  }
+
+  window.addEventListener('hashchange', () => {
+    const loaded = decodeState(location.hash);
+    if(loaded){ state = loaded; render(); }
+  });
+
+  if(!location.hash) save(); else render();
+})();
+</script>
+</body>
+</html>
