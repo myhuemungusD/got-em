@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🎲 GOT-EM · Street Dice</title>
+<style>
+:root{
+  --bg:#0f0e17;--surface:#1a1a2e;--card:#16213e;
+  --accent:#e94560;--gold:#f5a623;--green:#2ecc71;
+  --red:#e74c3c;--blue:#5dade2;--purple:#9b59b6;
+  --text:#fffffe;--muted:#a7a9be;--border:#2d2d4e;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;
+  min-height:100vh;padding:16px;max-width:640px;margin:0 auto}
+
+/* ── MENU ────────────────────────────────── */
+.menu-title{text-align:center;font-size:2.4rem;font-weight:900;
+  background:linear-gradient(135deg,var(--accent),var(--gold));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  background-clip:text;letter-spacing:2px;margin-bottom:4px}
+.menu-sub{text-align:center;color:var(--muted);font-size:.9rem;margin-bottom:28px}
+.menu-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.game-card{background:var(--card);border:2px solid var(--border);border-radius:14px;
+  padding:22px 16px;cursor:pointer;transition:all .2s;text-align:center}
+.game-card:hover{border-color:var(--accent);transform:translateY(-3px);
+  box-shadow:0 8px 24px rgba(233,69,96,.25)}
+.game-card .emoji{font-size:2.2rem;margin-bottom:10px}
+.game-card h2{font-size:1.05rem;font-weight:700;margin-bottom:5px}
+.game-card p{color:var(--muted);font-size:.78rem;line-height:1.4}
+
+/* ── LAYOUT ──────────────────────────────── */
+.hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.back{background:none;border:none;color:var(--muted);cursor:pointer;
+  font-size:1rem;padding:6px 10px;border-radius:6px}
+.back:hover{color:var(--text);background:var(--card)}
+.gtitle{font-size:1.15rem;font-weight:700;color:var(--accent)}
+.badge{font-size:.72rem;color:var(--muted);background:var(--card);
+  padding:3px 8px;border-radius:10px}
+
+/* ── SCOREBOARD ──────────────────────────── */
+.scores{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
+.pcard{background:var(--card);border:2px solid var(--border);border-radius:12px;
+  padding:14px;text-align:center;transition:border-color .25s}
+.pcard.active{border-color:var(--accent)}
+.pcard.win-card{border-color:var(--gold);background:rgba(245,166,35,.08)}
+.plabel{font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px}
+.pnum{font-size:2rem;font-weight:800;margin:4px 0;line-height:1}
+.psub{font-size:.72rem;color:var(--muted)}
+
+/* ── DICE AREA ───────────────────────────── */
+.dice-area{background:var(--card);border-radius:14px;padding:20px;
+  margin-bottom:14px;text-align:center;min-height:90px}
+.dice-row{display:flex;justify-content:center;flex-wrap:wrap;gap:6px;margin:10px 0}
+.die-wrap{display:inline-block;margin:3px}
+.die-wrap.pickable{cursor:pointer}
+.die-wrap.pickable:hover svg rect:first-child{stroke:var(--gold)!important}
+@keyframes shake{
+  0%,100%{transform:rotate(0) scale(1)}
+  20%{transform:rotate(-18deg) scale(1.05)}
+  40%{transform:rotate(18deg) scale(1.05)}
+  60%{transform:rotate(-12deg)}
+  80%{transform:rotate(12deg)}
+}
+.rolling .die-wrap{animation:shake .35s ease-in-out}
+.roll-label{font-size:.7rem;text-transform:uppercase;letter-spacing:1px;
+  color:var(--muted);margin-bottom:4px}
+.sum-label{font-size:1.15rem;font-weight:700;color:var(--gold);margin-top:6px}
+
+/* ── STATUS ──────────────────────────────── */
+.status{text-align:center;padding:10px 14px;font-size:.9rem;color:var(--muted);
+  margin-bottom:12px;background:var(--card);border-radius:10px;line-height:1.5}
+.status.ok{color:var(--green)}
+.status.bad{color:var(--red)}
+.status.warn{color:var(--gold)}
+
+/* ── BUTTONS ─────────────────────────────── */
+.btns{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-bottom:14px}
+.btn{padding:11px 22px;border-radius:9px;border:none;font-size:.9rem;font-weight:700;
+  cursor:pointer;transition:all .15s;text-transform:uppercase;letter-spacing:.6px}
+.btn:disabled{opacity:.35;cursor:not-allowed}
+.btn-red{background:var(--accent);color:#fff}
+.btn-red:hover:not(:disabled){background:#c0392b}
+.btn-green{background:var(--green);color:#111}
+.btn-green:hover:not(:disabled){background:#27ae60}
+.btn-gold{background:var(--gold);color:#111}
+.btn-gold:hover:not(:disabled){background:#d68910}
+.btn-outline{background:none;border:2px solid var(--border);color:var(--text)}
+.btn-outline:hover:not(:disabled){border-color:var(--muted)}
+.btn-blue{background:var(--blue);color:#111}
+.btn-blue:hover:not(:disabled){background:#2e86c1}
+
+/* ── SHARE BOX ───────────────────────────── */
+.share-box{background:var(--card);border:2px solid var(--border);border-radius:12px;
+  padding:14px;margin-bottom:14px;text-align:center}
+.share-box p{color:var(--muted);font-size:.8rem;margin-bottom:8px}
+.share-url{background:var(--bg);border:1px solid var(--border);border-radius:6px;
+  padding:6px 10px;font-size:.7rem;color:var(--gold);word-break:break-all;
+  margin-bottom:8px;max-height:52px;overflow:hidden;font-family:monospace}
+
+/* ── WINNER BANNER ───────────────────────── */
+.winner-banner{background:linear-gradient(135deg,#f5a623 0%,#e94560 100%);
+  border-radius:16px;padding:24px;text-align:center;margin-bottom:16px}
+.winner-banner h2{font-size:2rem;margin-bottom:6px}
+.winner-banner p{opacity:.88;font-size:.95rem}
+
+/* ── HISTORY ─────────────────────────────── */
+.history{margin-top:6px}
+.history h3{font-size:.75rem;color:var(--muted);text-transform:uppercase;
+  letter-spacing:1px;margin-bottom:8px}
+.hitem{background:var(--card);border-radius:7px;padding:8px 12px;
+  margin-bottom:5px;font-size:.82rem;color:var(--muted);
+  border-left:3px solid var(--border)}
+.hitem.p1{border-left-color:var(--blue)}
+.hitem.p2{border-left-color:var(--accent)}
+.hitem .res{font-weight:700}
+.hitem .res.ok{color:var(--green)}
+.hitem .res.bad{color:var(--red)}
+.hitem .res.warn{color:var(--gold)}
+
+/* ── CLO LAYOUT ──────────────────────────── */
+.clo-grid{display:grid;grid-template-columns:1fr auto 1fr;
+  align-items:start;gap:10px;margin-bottom:14px}
+.clo-side{text-align:center}
+.clo-side .pname{font-size:.72rem;color:var(--muted);
+  text-transform:uppercase;letter-spacing:1px;margin-bottom:8px}
+.clo-side .result-lbl{font-size:.95rem;font-weight:700;margin-top:6px;min-height:1.4em}
+.vs-mid{font-size:1.4rem;color:var(--border);padding-top:30px}
+
+/* ── FARKLE ──────────────────────────────── */
+.farkle-counts{display:flex;gap:10px;justify-content:center;
+  font-size:.8rem;color:var(--muted);margin-bottom:8px}
+.farkle-counts span{background:var(--surface);padding:3px 10px;border-radius:6px}
+.farkle-counts span b{color:var(--text)}
+.turn-total{font-size:1.1rem;font-weight:700;color:var(--gold);margin:6px 0 2px}
+.point-chip{display:inline-block;background:var(--blue);color:#fff;
+  border-radius:4px;padding:2px 8px;font-size:.75rem;font-weight:700;margin-left:4px}
+.hot-notice{color:var(--gold);font-weight:700;font-size:.9rem;
+  background:rgba(245,166,35,.12);border-radius:6px;padding:6px 12px;
+  display:inline-block;margin:4px 0}
+.farkle-notice{color:var(--red);font-weight:700;font-size:1rem;
+  background:rgba(231,76,60,.1);border-radius:6px;padding:8px 14px}
+.ob-badge{font-size:.68rem;background:var(--green);color:#111;
+  border-radius:3px;padding:1px 5px;font-weight:700;margin-left:4px}
+
+/* ── TOAST ───────────────────────────────── */
+.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);
+  background:#333;color:#fff;padding:10px 20px;border-radius:20px;
+  font-size:.88rem;z-index:9999;pointer-events:none;opacity:0;transition:opacity .2s}
+.toast.show{opacity:1}
+
+/* ── RESPONSIVE ──────────────────────────── */
+@media(max-width:400px){
+  .menu-grid{grid-template-columns:1fr}
+  .die-wrap svg{width:48px!important;height:48px!important}
+}
+</style>
+</head>
+<body>
+<!-- Shared SVG filter reused by all dice -->
+<svg style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true">
+  <defs><filter id="die-shadow"><feDropShadow dx="0" dy="2" stdDeviation="2" flood-opacity=".25"/></filter></defs>
+</svg>
+<div id="app"></div>
+<div id="toast" class="toast"></div>
+
+<script>'use strict';
+
+/* ═══════════════════════════════════════════════════════════
+   STATE
+   ═══════════════════════════════════════════════════════════ */
+let S = null;          // game state (serialised to URL)
+let tmpHeld = new Set(); // farkle die-selection (local, not in URL)
+
+function enc(s){
+  /* UTF-8-safe base64: JSON → UTF-8 bytes → binary string → base64 */
+  const bytes = new TextEncoder().encode(JSON.stringify(s));
+  let bin = '';
+  for(const b of bytes) bin += String.fromCharCode(b);
+  return btoa(bin);
+}
+function dec(e){
+  try{
+    const bin = atob(e);
+    const bytes = new Uint8Array(bin.length);
+    for(let i=0;i<bin.length;i++) bytes[i]=bin.charCodeAt(i);
+    return JSON.parse(new TextDecoder().decode(bytes));
+  }catch{ return null; }
+}
+
+function save(){
+  if(S) history.replaceState(null,'','#'+enc(S));
+  else  history.replaceState(null,'',location.pathname+location.search);
+}
+function loadURL(){ const h=location.hash.slice(1); return h?dec(h):null; }
+
+/* ═══════════════════════════════════════════════════════════
+   DICE UTILITIES
+   ═══════════════════════════════════════════════════════════ */
+function rollDice(n){ return Array.from({length:n},()=>Math.floor(Math.random()*6)+1); }
+
+/* dot grid for SVG dice */
+const DOTS={
+  1:[[25,25]],
+  2:[[14,14],[36,36]],
+  3:[[14,14],[25,25],[36,36]],
+  4:[[14,14],[36,14],[14,36],[36,36]],
+  5:[[14,14],[36,14],[25,25],[14,36],[36,36]],
+  6:[[14,11],[36,11],[14,25],[36,25],[14,39],[36,39]],
+};
+
+function dieSVG(val, opts={}){
+  const {sz=58, held=false, scoring=false, faded=false, idx=null, game=null} = opts;
+  const bg    = held ? '#27ae60' : (faded ? '#2a2a3a' : '#f7f7f7');
+  const dot   = held ? '#fff'    : (faded ? '#555'    : '#1a1a2e');
+  const stroke= held ? '#1e8449' : (scoring ? '#f5a623' : (faded ? '#222' : '#c8c8c8'));
+  const sw    = scoring||held ? 3 : 2;
+
+  const canClick = game && scoring && idx!==null;
+  const wrapCls  = canClick ? 'die-wrap pickable' : 'die-wrap';
+  const clickEvt = canClick ? `onclick="fToggle(${idx})"` : '';
+
+  const circles = (DOTS[val]||[]).map(([x,y])=>
+    `<circle cx="${x}" cy="${y}" r="3.8" fill="${dot}"/>`).join('');
+
+  return `<span class="${wrapCls}" ${clickEvt}>` +
+    `<svg viewBox="0 0 50 50" width="${sz}" height="${sz}">` +
+    `<rect x="2" y="2" width="46" height="46" rx="9" fill="${bg}" stroke="${stroke}" stroke-width="${sw}" filter="url(#die-shadow)"/>` +
+    circles +
+    `</svg></span>`;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   CRAPS LOGIC
+   ═══════════════════════════════════════════════════════════ */
+function crapsEval(rolls){
+  /* returns {phase:'comeout'|'point'|'done', pt, won} */
+  let pt=null;
+  for(const r of rolls){
+    const s=r[0]+r[1];
+    if(pt===null){
+      if(s===7||s===11) return {phase:'done',pt,won:true};
+      if(s===2||s===3||s===12) return {phase:'done',pt,won:false};
+      pt=s;
+    } else {
+      if(s===pt) return {phase:'done',pt,won:true};
+      if(s===7)  return {phase:'done',pt,won:false};
+    }
+  }
+  return {phase:pt?'point':'comeout',pt,won:false};
+}
+
+/* ═══════════════════════════════════════════════════════════
+   C-LO / 4-5-6 LOGIC
+   ═══════════════════════════════════════════════════════════ */
+function cloScore(dice){
+  const [a,b,c]=[...dice].sort((x,y)=>x-y);
+  if(a===4&&b===5&&c===6) return {t:'456', r:9999, lbl:'4-5-6! 🎰 Auto-win!'};
+  if(a===b&&b===c)        return {t:'trip',r:800+a, lbl:`Trips ${a}s! 🎲`, v:a};
+  if(a===1&&b===2&&c===3) return {t:'123', r:-1,   lbl:'1-2-3 💀 Auto-loss!'};
+  if(a===b)               return {t:'pt',  r:c,    lbl:`Point: ${c}`, v:c};
+  if(b===c)               return {t:'pt',  r:a,    lbl:`Point: ${a}`, v:a};
+  return {t:'none', r:null, lbl:'No combo — re-roll'};
+}
+
+function cloWinner(s1,s2){
+  /* returns 1, 2, or 0 (tie) */
+  if(!s1||!s2||s1.r===null||s2.r===null) return null;
+  if(s1.r>s2.r) return 1;
+  if(s2.r>s1.r) return 2;
+  return 0;
+}
+
+/* get the last non-'none' score from a roll history */
+function cloFinalScore(rolls){
+  if(!rolls) return null;
+  for(let i=rolls.length-1;i>=0;i--){
+    const sc=cloScore(rolls[i]);
+    if(sc.t!=='none') return sc;
+  }
+  return null;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   FARKLE / 10,000 LOGIC
+   ═══════════════════════════════════════════════════════════ */
+
+/* Named constant for the minimum score required to get on the board */
+const MIN_ONBOARD = 1000;
+
+/* N-of-a-kind score multiplier table indexed by count (3→1×, 4→2×, 5→4×, 6→8×) */
+const NOK_MULT = [0, 0, 0, 1, 2, 4, 8];
+
+/* Detect special full-6-dice patterns; returns 'straight', '3pairs', or null */
+function fSpecialPattern(dice, counts){
+  if(dice.length!==6) return null;
+  if(counts.slice(1).every(x=>x===1)) return 'straight';
+  if(counts.slice(1).filter(x=>x===2).length===3) return '3pairs';
+  return null;
+}
+
+function fScore(dice){
+  if(!dice||dice.length===0) return 0;
+  const c=new Array(7).fill(0);
+  dice.forEach(d=>c[d]++);
+  const sp=fSpecialPattern(dice,c);
+  if(sp==='straight') return 1500;
+  if(sp==='3pairs')   return 1000;
+  let sc=0;
+  const u=[...c];
+  for(let v=1;v<=6;v++){
+    if(u[v]>=3){
+      const base=v===1?1000:v*100;
+      sc+=base*NOK_MULT[Math.min(u[v],6)];
+      u[v]=0;
+    }
+  }
+  sc+=u[1]*100+u[5]*50;
+  return sc;
+}
+
+function fCanScore(dice){
+  if(!dice||!dice.length) return false;
+  const c=new Array(7).fill(0);
+  dice.forEach(d=>c[d]++);
+  if(fSpecialPattern(dice,c)) return true;
+  for(let v=1;v<=6;v++) if(c[v]>=3) return true;
+  return c[1]>0||c[5]>0;
+}
+
+function fScoringIdx(dice){
+  const c=new Array(7).fill(0);
+  dice.forEach(d=>c[d]++);
+  /* straight or 3-pairs: every die contributes */
+  if(fSpecialPattern(dice,c)) return new Set(dice.map((_,i)=>i));
+  const s=new Set();
+  dice.forEach((v,i)=>{ if(v===1||v===5||c[v]>=3) s.add(i); });
+  return s;
+}
+
+function fValidSel(dice, sel){
+  if(!sel||sel.size===0) return false;
+  return fScore([...sel].map(i=>dice[i]))>0;
+}
+
+/* how many dice to roll next, given completed cycles */
+function fNextCount(ct){
+  if(!ct||!ct.cy||!ct.cy.length) return 6;
+  const last=ct.cy[ct.cy.length-1];
+  /* hot dice: all dice in last roll were held */
+  if(last.h.length===last.d.length) return 6;
+  return last.d.length-last.h.length;
+}
+
+/* accumulated score from all committed cycles */
+function fTurnScore(ct){
+  if(!ct||!ct.cy) return 0;
+  return ct.cy.reduce((s,c)=>s+fScore(c.h.map(i=>c.d[i])),0);
+}
+
+/* score the current pending selection (uncommitted) */
+function fSelScore(ct){
+  if(!ct||!ct.cur||!tmpHeld.size) return 0;
+  return fScore([...tmpHeld].map(i=>ct.cur[i]));
+}
+
+/* ═══════════════════════════════════════════════════════════
+   GAME FACTORY
+   ═══════════════════════════════════════════════════════════ */
+function mkGame(g){
+  if(g==='craps') return {g,p:1,s:[0,0],h:[],ct:null};
+  if(g==='clo'||g==='456') return {g,p:1,r1:[],r2:[],done:false};
+  if(g==='10k')  return {g,p:1,sc:[0,0],ob:[false,false],h:[],ct:null};
+}
+
+/* ═══════════════════════════════════════════════════════════
+   GLOBAL ACTION HANDLERS
+   ═══════════════════════════════════════════════════════════ */
+window.goMenu   = ()=>{ S=null; tmpHeld=new Set(); save(); render(); };
+window.newGame  = g  =>{ S=mkGame(g); tmpHeld=new Set(); save(); render(); };
+
+/* ── CRAPS ─────────────────────────────────────────────── */
+window.crapsRoll = ()=>{
+  if(S.winner) return;
+  const d=rollDice(2);
+  if(!S.ct) S.ct={rolls:[]};
+  S.ct.rolls.push(d);
+  const ev=crapsEval(S.ct.rolls);
+  if(ev.phase==='done'){
+    const pi=S.p-1;
+    if(ev.won) S.s[pi]++;
+    S.h.push({p:S.p, rolls:[...S.ct.rolls], won:ev.won});
+    S.ct=null;
+    if(S.s[pi]>=3) S.winner=S.p;
+    else           S.p=S.p===1?2:1;
+  }
+  save(); render();
+};
+
+/* ── C-LO / 4-5-6 ──────────────────────────────────────── */
+window.cloRoll = ()=>{
+  if(S.done) return;
+  const d=rollDice(3);
+  const sc=cloScore(d);
+  if(S.p===1){
+    S.r1.push(d);
+    /* switch to P2 once P1 has a valid (non-re-roll) result */
+    if(sc.t!=='none') S.p=2;
+  } else {
+    S.r2.push(d);
+    if(sc.t!=='none'){
+      S.done=true;
+      const s1=cloFinalScore(S.r1);
+      const s2=cloFinalScore(S.r2);
+      const w=cloWinner(s1,s2);
+      S.winner=(w===0)?'tie':w;
+    }
+  }
+  save(); render();
+};
+
+/* ── FARKLE ─────────────────────────────────────────────── */
+window.fToggle = i=>{
+  if(!S.ct||!S.ct.cur) return;
+  const sc=fScoringIdx(S.ct.cur);
+  if(!sc.has(i)) return;
+  tmpHeld.has(i)?tmpHeld.delete(i):tmpHeld.add(i);
+  render();
+};
+
+window.fRoll = ()=>{
+  if(!S.ct) S.ct={cy:[],cur:null};
+  const n=fNextCount(S.ct);
+  const d=rollDice(n);
+  S.ct.cur=d;
+  tmpHeld=new Set();
+  if(!fCanScore(d)){
+    /* FARKLE */
+    S.h.push({p:S.p, ts:0, fk:true});
+    S.ct=null;
+    if(!S.winner) S.p=S.p===1?2:1;
+    save(); render();
+    return;
+  }
+  save(); render();
+};
+
+window.fLock = ()=>{
+  if(!S.ct||!S.ct.cur||!tmpHeld.size){ showToast('⚠️ Select at least one scoring die first'); return; }
+  if(!fValidSel(S.ct.cur,tmpHeld)){ showToast('⚠️ Invalid selection — pick scoring dice only'); return; }
+  S.ct.cy.push({d:[...S.ct.cur], h:[...tmpHeld]});
+  S.ct.cur=null;
+  tmpHeld=new Set();
+  save(); render();
+};
+
+window.fBank = ()=>{
+  /* optionally commit pending selection first */
+  if(S.ct&&S.ct.cur&&tmpHeld.size>0){
+    if(!fValidSel(S.ct.cur,tmpHeld)){ showToast('⚠️ Invalid selection'); return; }
+    S.ct.cy.push({d:[...S.ct.cur], h:[...tmpHeld]});
+    S.ct.cur=null;
+    tmpHeld=new Set();
+  }
+  const pi=S.p-1;
+  const ts=fTurnScore(S.ct||{cy:[]});
+  if(!S.ob[pi]&&ts<MIN_ONBOARD){
+    showToast(`Need 1,000 to get on the board — you have ${ts.toLocaleString()}`);
+    return;
+  }
+  S.h.push({p:S.p, ts, fk:false});
+  S.ob[pi]=true;
+  S.sc[pi]+=ts;
+  if(S.sc[pi]>=10000){
+    S.winner=S.p;
+  } else {
+    S.p=S.p===1?2:1;
+  }
+  S.ct=null; tmpHeld=new Set();
+  save(); render();
+};
+
+/* ═══════════════════════════════════════════════════════════
+   SHARE / COPY
+   ═══════════════════════════════════════════════════════════ */
+window.copyLink = ()=>{
+  const url=location.href;
+  const ok=()=>showToast('🔗 Link copied to clipboard!');
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(url).then(ok).catch(()=>fbCopy(url));
+  } else { fbCopy(url); }
+};
+function fbCopy(t){
+  const ta=document.createElement('textarea');
+  ta.value=t; ta.style.cssText='position:fixed;opacity:0';
+  document.body.appendChild(ta); ta.select();
+  try{ document.execCommand('copy'); showToast('🔗 Link copied!'); }catch{}
+  document.body.removeChild(ta);
+}
+
+let _toastTimer=null;
+function showToast(msg){
+  const el=document.getElementById('toast');
+  el.textContent=msg; el.className='toast show';
+  clearTimeout(_toastTimer);
+  _toastTimer=setTimeout(()=>el.className='toast',2400);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   RENDER HELPERS
+   ═══════════════════════════════════════════════════════════ */
+function shareBox(msg){
+  const url=location.href;
+  return `<div class="share-box">
+    <p>${msg||'Share this link with your opponent:'}</p>
+    <div class="share-url">${url}</div>
+    <button class="btn btn-outline" onclick="copyLink()">📋 Copy Link</button>
+  </div>`;
+}
+
+function winnerBanner(p, extra=''){
+  return `<div class="winner-banner">
+    <h2>🏆 Player ${p} Wins!</h2>
+    <p>${extra}</p>
+  </div>`;
+}
+
+function tieBanner(extra=''){
+  return `<div class="winner-banner" style="background:linear-gradient(135deg,#3498db,#9b59b6)">
+    <h2>🤝 It's a Tie!</h2>
+    <p>${extra}</p>
+  </div>`;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   CRAPS RENDER
+   ═══════════════════════════════════════════════════════════ */
+function renderCraps(){
+  const {p,s,h,ct,winner}=S;
+  const ev=ct?crapsEval(ct.rolls):null;
+  const lastRoll=ct&&ct.rolls.length?ct.rolls[ct.rolls.length-1]:null;
+
+  let statusHTML='', statusCls='';
+
+  if(winner){
+    statusHTML=`Player ${winner} has won the game!`;
+    statusCls='ok';
+  } else if(ev){
+    const sum=lastRoll[0]+lastRoll[1];
+    if(ev.phase==='point'){
+      statusHTML=`Point set: <span class="point-chip">${ev.pt}</span> — roll <b>${ev.pt}</b> to win, avoid 7`;
+      statusCls='warn';
+    } else {
+      statusHTML=`Come-out roll — 7/11 wins, 2/3/12 craps out`;
+    }
+  } else {
+    statusHTML=`Player ${p}'s turn — press Roll to start your shooter sequence`;
+  }
+
+  const diceHTML=lastRoll
+    ? `<div class="roll-label">Latest roll</div>
+       <div class="dice-row">${lastRoll.map(v=>dieSVG(v)).join('')}</div>
+       <div class="sum-label">Sum: ${lastRoll[0]+lastRoll[1]}</div>`
+    : `<p style="color:var(--muted);padding:18px 0;font-size:.85rem">No dice rolled yet this turn</p>`;
+
+  const histHTML=h.length
+    ? h.slice(-8).map(t=>{
+        const rolls=t.rolls.map(r=>`[${r[0]}+${r[1]}=${r[0]+r[1]}]`).join(' → ');
+        return `<div class="hitem p${t.p}">
+          <b>P${t.p}:</b> ${rolls}
+          <span class="res ${t.won?'ok':'bad'}">${t.won?'WIN':'LOSS'}</span>
+        </div>`;
+      }).join('')
+    : '<p style="color:var(--muted);font-size:.82rem">No turns played yet</p>';
+
+  return `
+    <div class="hdr">
+      <button class="back" onclick="goMenu()">← Menu</button>
+      <span class="gtitle">🎲 Street Craps</span>
+      <span class="badge">First to 3</span>
+    </div>
+    <div class="scores">
+      <div class="pcard ${!winner&&p===1?'active':''} ${winner===1?'win-card':''}">
+        <div class="plabel">Player 1</div>
+        <div class="pnum" style="color:var(--blue)">${s[0]}<span style="font-size:.9rem;color:var(--muted)">/3</span></div>
+        <div class="psub">wins</div>
+      </div>
+      <div class="pcard ${!winner&&p===2?'active':''} ${winner===2?'win-card':''}">
+        <div class="plabel">Player 2</div>
+        <div class="pnum" style="color:var(--accent)">${s[1]}<span style="font-size:.9rem;color:var(--muted)">/3</span></div>
+        <div class="psub">wins</div>
+      </div>
+    </div>
+    ${winner?winnerBanner(winner,'Share the link to celebrate!'):''}
+    <div class="dice-area">
+      ${diceHTML}
+    </div>
+    <div class="status ${statusCls}">${statusHTML}</div>
+    ${!winner?`<div class="btns">
+      <button class="btn btn-red" onclick="crapsRoll()">🎲 Roll — Player ${p}</button>
+    </div>`:''}
+    ${!winner?shareBox('After your roll, share this link so your opponent can take their turn:'):''}
+    ${winner?`<div class="btns"><button class="btn btn-outline" onclick="newGame('craps')">🔄 New Game</button></div>`:''}
+    <div class="history"><h3>Turn History</h3>${histHTML}</div>`;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   C-LO / 4-5-6 RENDER
+   ═══════════════════════════════════════════════════════════ */
+function renderClo(){
+  const {g,p,r1,r2,done,winner}=S;
+  const gName=g==='clo'?'C-Lo':'4-5-6';
+  const gEmoji=g==='clo'?'🎲':'🎰';
+
+  const s1=cloFinalScore(r1);
+  const s2=cloFinalScore(r2);
+  const lastR1=r1.length?r1[r1.length-1]:null;
+  const lastR2=r2.length?r2[r2.length-1]:null;
+
+  /* left panel */
+  const p1dice=lastR1
+    ? `<div class="dice-row">${lastR1.map(v=>dieSVG(v,{sz:52})).join('')}</div>
+       <div class="clo-side result-lbl" style="color:${s1?'var(--gold)':'var(--muted)'}">
+         ${s1?s1.lbl:'…'}
+       </div>`
+    : `<p style="color:var(--muted);font-size:.8rem">${p===1?'Your turn':'Waiting…'}</p>`;
+
+  /* right panel */
+  const p2dice=lastR2
+    ? `<div class="dice-row">${lastR2.map(v=>dieSVG(v,{sz:52})).join('')}</div>
+       <div class="clo-side result-lbl" style="color:${s2?'var(--accent)':'var(--muted)'}">
+         ${s2?s2.lbl:'…'}
+       </div>`
+    : `<p style="color:var(--muted);font-size:.8rem">${p===2?'Your turn':'Waiting…'}</p>`;
+
+  let statusHTML='', statusCls='';
+  if(done){
+    if(winner==='tie') { statusHTML="It's a tie — same point!"; statusCls='warn'; }
+    else { statusHTML=`Player ${winner} wins this round!`; statusCls='ok'; }
+  } else if(p===1){
+    if(s1) statusHTML=`P1 locked in <b>${s1.lbl}</b> — share the link so Player 2 can roll`;
+    else   statusHTML=r1.length?`No combo — Player 1 must re-roll`:`Player 1: roll your dice!`;
+    statusCls=s1?'warn':'';
+  } else {
+    statusHTML=s2?`P2 rolled <b>${s2.lbl}</b> — computing result…`
+               :r2.length?`No combo — Player 2 must re-roll`:`Player 2: roll your dice!`;
+  }
+
+  /* roll history */
+  const allHist=[
+    ...r1.map((d,i)=>{ const sc=cloScore(d); return `<div class="hitem p1">P1 roll ${i+1}: [${d.join(',')}] — <span class="res ${sc.t==='none'?'':'ok'}">${sc.lbl}</span></div>`; }),
+    ...r2.map((d,i)=>{ const sc=cloScore(d); return `<div class="hitem p2">P2 roll ${i+1}: [${d.join(',')}] — <span class="res ${sc.t==='none'?'':'ok'}">${sc.lbl}</span></div>`; }),
+  ].join('');
+
+  const canRoll=!done;
+
+  return `
+    <div class="hdr">
+      <button class="back" onclick="goMenu()">← Menu</button>
+      <span class="gtitle">${gEmoji} ${gName}</span>
+      <span class="badge">Best of 1</span>
+    </div>
+    ${done&&winner&&winner!=='tie'?winnerBanner(winner,`Winning combo: ${winner===1?s1.lbl:s2.lbl}`):''}
+    ${done&&winner==='tie'?tieBanner('Same point — no winner this round'):''}
+    <div class="clo-grid">
+      <div class="clo-side">
+        <div class="pname" style="color:var(--blue)">Player 1</div>
+        ${p1dice}
+      </div>
+      <div class="vs-mid">VS</div>
+      <div class="clo-side">
+        <div class="pname" style="color:var(--accent)">Player 2</div>
+        ${p2dice}
+      </div>
+    </div>
+    <div class="status ${statusCls}">${statusHTML}</div>
+    ${canRoll?`<div class="btns">
+      <button class="btn btn-red" onclick="cloRoll()">🎲 Roll — Player ${p}</button>
+    </div>`:''}
+    ${canRoll&&s1&&p===1?shareBox('Player 1 locked in — share so Player 2 can roll:'):''}
+    ${canRoll&&!s1?shareBox():''}
+    ${done?`<div class="btns"><button class="btn btn-outline" onclick="newGame('${g}')">🔄 Play Again</button></div>`:''}
+    ${done?shareBox('Game over — share the result!'):''}
+    <div class="history"><h3>Roll History</h3>${allHist||'<p style="color:var(--muted);font-size:.82rem">No rolls yet</p>'}</div>`;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   FARKLE / 10,000 RENDER
+   ═══════════════════════════════════════════════════════════ */
+function renderFarkle(){
+  const {p,sc,ob,h,ct,winner}=S;
+  const pi=p-1;
+  const ts=fTurnScore(ct);
+  const selSc=fSelScore(ct);
+  const totalTurn=ts+selSc;
+  const dice=ct&&ct.cur;
+  const scoringIdx=dice?fScoringIdx(dice):new Set();
+  const needToRoll=!ct||!ct.cur;
+
+  /* check if last cycle was hot dice */
+  let hotDice=false;
+  if(ct&&ct.cy&&ct.cy.length&&!ct.cur){
+    const last=ct.cy[ct.cy.length-1];
+    if(last.h.length===last.d.length) hotDice=true;
+  }
+
+  /* ── dice display ── */
+  let diceHTML='<p style="color:var(--muted);padding:16px 0;font-size:.85rem">Press Roll to start your turn</p>';
+  if(dice){
+    const dArr=dice.map((v,i)=>{
+      const isScoring=scoringIdx.has(i);
+      const isHeld=tmpHeld.has(i);
+      return dieSVG(v,{sz:58, held:isHeld, scoring:isScoring&&!isHeld, faded:!isScoring&&!isHeld, idx:i, game:'10k'});
+    }).join('');
+    diceHTML=`<div class="roll-label">Roll — click <span style="color:var(--gold)">golden</span> dice to score them</div>
+      <div class="dice-row">${dArr}</div>
+      ${tmpHeld.size?`<div style="color:var(--green);font-size:.85rem;margin-top:4px">Selected: <b>+${selSc.toLocaleString()}</b> pts</div>`:''}`;
+  }
+
+  /* committed cycles display */
+  let cyclesHTML='';
+  if(ct&&ct.cy&&ct.cy.length){
+    cyclesHTML=ct.cy.map((c,i)=>{
+      const heldVals=c.h.map(j=>c.d[j]);
+      return `<div style="font-size:.78rem;color:var(--muted);margin-bottom:3px">
+        Roll ${i+1}: [${c.d.join(',')}] → kept [${heldVals.join(',')}] = <b style="color:var(--gold)">${fScore(heldVals).toLocaleString()}</b>
+      </div>`;
+    }).join('');
+  }
+
+  /* history */
+  const histHTML=h.length
+    ? h.slice(-10).map(t=>`<div class="hitem p${t.p}">
+        <b>P${t.p}:</b>
+        ${t.fk?`<span class="res bad">FARKLE</span>`:
+               `banked <span class="res ok">+${t.ts.toLocaleString()}</span>`}
+      </div>`).join('')
+    : '<p style="color:var(--muted);font-size:.82rem">No turns yet</p>';
+
+  /* on-board label */
+  const obLabel=(v,i)=>`${v.toLocaleString()}${ob[i]?'':' <span class="ob-badge">Need 1k</span>'}`;
+
+  return `
+    <div class="hdr">
+      <button class="back" onclick="goMenu()">← Menu</button>
+      <span class="gtitle">🎯 10,000</span>
+      <span class="badge">First to 10k</span>
+    </div>
+    <div class="scores">
+      <div class="pcard ${!winner&&p===1?'active':''} ${winner===1?'win-card':''}">
+        <div class="plabel">Player 1</div>
+        <div class="pnum" style="color:var(--blue)">${sc[0].toLocaleString()}</div>
+        <div class="psub">${obLabel(sc[0],0)}</div>
+      </div>
+      <div class="pcard ${!winner&&p===2?'active':''} ${winner===2?'win-card':''}">
+        <div class="plabel">Player 2</div>
+        <div class="pnum" style="color:var(--accent)">${sc[1].toLocaleString()}</div>
+        <div class="psub">${obLabel(sc[1],1)}</div>
+      </div>
+    </div>
+    ${winner?winnerBanner(winner,`Final score: ${sc[winner-1].toLocaleString()}`):''}
+    <div class="dice-area">
+      ${hotDice?`<div class="hot-notice">🔥 HOT DICE — all scored! Roll all 6 again!</div>`:''}
+      ${diceHTML}
+      ${cyclesHTML?`<hr style="border-color:var(--border);margin:10px 0">${cyclesHTML}`:''}
+      <div class="farkle-counts">
+        <span>This turn: <b style="color:var(--gold)">${totalTurn.toLocaleString()}</b></span>
+        <span>Dice left: <b>${needToRoll?fNextCount(ct):dice?dice.length-tmpHeld.size:6}</b></span>
+      </div>
+    </div>
+    ${!winner?`<div class="btns">
+      ${needToRoll?`<button class="btn btn-red" onclick="fRoll()">🎲 Roll${hotDice?' 6 (Hot!)':''} — Player ${p}</button>`:''}
+      ${dice&&tmpHeld.size?`<button class="btn btn-gold" onclick="fLock()">🔒 Lock & Roll More</button>`:''}
+      ${dice&&tmpHeld.size?`<button class="btn btn-green" onclick="fBank()">🏦 Bank ${totalTurn.toLocaleString()}</button>`:''}
+      ${ct&&ct.cy&&ct.cy.length&&needToRoll?`<button class="btn btn-green" onclick="fBank()">🏦 Bank ${ts.toLocaleString()}</button>`:''}
+    </div>`:''}
+    ${!winner?shareBox('Share after your turn ends (bank or farkle):'):''}
+    ${winner?`<div class="btns"><button class="btn btn-outline" onclick="newGame('10k')">🔄 New Game</button></div>`:''}
+    <div class="history"><h3>Turn History</h3>${histHTML}</div>`;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   MAIN RENDER
+   ═══════════════════════════════════════════════════════════ */
+function renderMenu(){
+  return `
+    <div style="padding-top:20px">
+      <div class="menu-title">GOT-EM</div>
+      <div class="menu-sub">🎲 Street Dice · 2-Player · Async via Shareable Link</div>
+      <div class="menu-grid">
+        <div class="game-card" onclick="newGame('craps')">
+          <div class="emoji">🎲</div>
+          <h2>Street Craps</h2>
+          <p>2 dice · Come-out roll · Set a point · First to 3 wins</p>
+        </div>
+        <div class="game-card" onclick="newGame('clo')">
+          <div class="emoji">🎰</div>
+          <h2>C-Lo</h2>
+          <p>3 dice · 4-5-6 auto-win · Trips · Points · Best of 1</p>
+        </div>
+        <div class="game-card" onclick="newGame('456')">
+          <div class="emoji">🃏</div>
+          <h2>4-5-6</h2>
+          <p>3 dice · Same rules as C-Lo · Head-to-head · Best of 1</p>
+        </div>
+        <div class="game-card" onclick="newGame('10k')">
+          <div class="emoji">🎯</div>
+          <h2>10,000</h2>
+          <p>6 dice · Farkle variant · Need 1k to start · First to 10,000</p>
+        </div>
+      </div>
+      <p style="text-align:center;color:var(--muted);font-size:.75rem;margin-top:24px">
+        Each game generates a shareable URL — pass it back and forth with your opponent.<br>
+        No accounts, no server, no installation needed.
+      </p>
+    </div>`;
+}
+
+function render(){
+  const app=document.getElementById('app');
+  if(!S){ app.innerHTML=renderMenu(); return; }
+  switch(S.g){
+    case 'craps': app.innerHTML=renderCraps(); break;
+    case 'clo':
+    case '456':   app.innerHTML=renderClo();   break;
+    case '10k':   app.innerHTML=renderFarkle(); break;
+    default:      app.innerHTML=renderMenu();
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   BOOT
+   ═══════════════════════════════════════════════════════════ */
+S=loadURL();
+render();
+</script>
+</body>
+</html>
