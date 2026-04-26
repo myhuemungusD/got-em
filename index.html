@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>🎲 Got-Em · Street Dice</title>
+<title>🎲 GOT-EM · Street Dice</title>
 <style>
 :root{
   --bg:#0f0e17;--surface:#1a1a2e;--card:#16213e;
@@ -158,6 +158,10 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
 </style>
 </head>
 <body>
+<!-- Shared SVG filter reused by all dice -->
+<svg style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true">
+  <defs><filter id="die-shadow"><feDropShadow dx="0" dy="2" stdDeviation="2" flood-opacity=".25"/></filter></defs>
+</svg>
 <div id="app"></div>
 <div id="toast" class="toast"></div>
 
@@ -169,8 +173,21 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
 let S = null;          // game state (serialised to URL)
 let tmpHeld = new Set(); // farkle die-selection (local, not in URL)
 
-function enc(s){ return btoa(unescape(encodeURIComponent(JSON.stringify(s)))); }
-function dec(e){ try{ return JSON.parse(decodeURIComponent(escape(atob(e)))); }catch{ return null; } }
+function enc(s){
+  /* UTF-8-safe base64: JSON → UTF-8 bytes → binary string → base64 */
+  const bytes = new TextEncoder().encode(JSON.stringify(s));
+  let bin = '';
+  for(const b of bytes) bin += String.fromCharCode(b);
+  return btoa(bin);
+}
+function dec(e){
+  try{
+    const bin = atob(e);
+    const bytes = new Uint8Array(bin.length);
+    for(let i=0;i<bin.length;i++) bytes[i]=bin.charCodeAt(i);
+    return JSON.parse(new TextDecoder().decode(bytes));
+  }catch{ return null; }
+}
 
 function save(){
   if(S) history.replaceState(null,'','#'+enc(S));
@@ -209,8 +226,7 @@ function dieSVG(val, opts={}){
 
   return `<span class="${wrapCls}" ${clickEvt}>` +
     `<svg viewBox="0 0 50 50" width="${sz}" height="${sz}">` +
-    `<defs><filter id="ds${idx??'x'}"><feDropShadow dx="0" dy="2" stdDeviation="2" flood-opacity=".25"/></filter></defs>` +
-    `<rect x="2" y="2" width="46" height="46" rx="9" fill="${bg}" stroke="${stroke}" stroke-width="${sw}" filter="url(#ds${idx??'x'})"/>` +
+    `<rect x="2" y="2" width="46" height="46" rx="9" fill="${bg}" stroke="${stroke}" stroke-width="${sw}" filter="url(#die-shadow)"/>` +
     circles +
     `</svg></span>`;
 }
@@ -269,20 +285,34 @@ function cloFinalScore(rolls){
 /* ═══════════════════════════════════════════════════════════
    FARKLE / 10,000 LOGIC
    ═══════════════════════════════════════════════════════════ */
+
+/* Named constant for the minimum score required to get on the board */
+const MIN_ONBOARD = 1000;
+
+/* N-of-a-kind score multiplier table indexed by count (3→1×, 4→2×, 5→4×, 6→8×) */
+const NOK_MULT = [0, 0, 0, 1, 2, 4, 8];
+
+/* Detect special full-6-dice patterns; returns 'straight', '3pairs', or null */
+function fSpecialPattern(dice, counts){
+  if(dice.length!==6) return null;
+  if(counts.slice(1).every(x=>x===1)) return 'straight';
+  if(counts.slice(1).filter(x=>x===2).length===3) return '3pairs';
+  return null;
+}
+
 function fScore(dice){
   if(!dice||dice.length===0) return 0;
   const c=new Array(7).fill(0);
   dice.forEach(d=>c[d]++);
-  /* straight 1-2-3-4-5-6 */
-  if(dice.length===6&&c.slice(1).every(x=>x===1)) return 1500;
-  /* three pairs */
-  if(dice.length===6&&c.slice(1).filter(x=>x===2).length===3) return 1000;
+  const sp=fSpecialPattern(dice,c);
+  if(sp==='straight') return 1500;
+  if(sp==='3pairs')   return 1000;
   let sc=0;
   const u=[...c];
   for(let v=1;v<=6;v++){
     if(u[v]>=3){
       const base=v===1?1000:v*100;
-      sc+=base*[0,0,0,1,2,4,8][Math.min(u[v],6)];
+      sc+=base*NOK_MULT[Math.min(u[v],6)];
       u[v]=0;
     }
   }
@@ -294,8 +324,7 @@ function fCanScore(dice){
   if(!dice||!dice.length) return false;
   const c=new Array(7).fill(0);
   dice.forEach(d=>c[d]++);
-  if(dice.length===6&&c.slice(1).every(x=>x===1)) return true;
-  if(dice.length===6&&c.slice(1).filter(x=>x===2).length===3) return true;
+  if(fSpecialPattern(dice,c)) return true;
   for(let v=1;v<=6;v++) if(c[v]>=3) return true;
   return c[1]>0||c[5]>0;
 }
@@ -303,8 +332,8 @@ function fCanScore(dice){
 function fScoringIdx(dice){
   const c=new Array(7).fill(0);
   dice.forEach(d=>c[d]++);
-  if(dice.length===6&&c.slice(1).every(x=>x===1)) return new Set(dice.map((_,i)=>i));
-  if(dice.length===6&&c.slice(1).filter(x=>x===2).length===3) return new Set(dice.map((_,i)=>i));
+  /* straight or 3-pairs: every die contributes */
+  if(fSpecialPattern(dice,c)) return new Set(dice.map((_,i)=>i));
   const s=new Set();
   dice.forEach((v,i)=>{ if(v===1||v===5||c[v]>=3) s.add(i); });
   return s;
@@ -436,7 +465,7 @@ window.fBank = ()=>{
   }
   const pi=S.p-1;
   const ts=fTurnScore(S.ct||{cy:[]});
-  if(!S.ob[pi]&&ts<1000){
+  if(!S.ob[pi]&&ts<MIN_ONBOARD){
     showToast(`Need 1,000 to get on the board — you have ${ts.toLocaleString()}`);
     return;
   }
