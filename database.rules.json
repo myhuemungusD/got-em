@@ -1,0 +1,11 @@
+{
+  "rules": {
+    "games": {
+      "$gameId": {
+        ".read": "auth != null",
+        ".write": "auth != null",
+        ".validate": "newData.hasChildren(['mode','players','current','log'])"
+      }
+    }
+  }
+}
