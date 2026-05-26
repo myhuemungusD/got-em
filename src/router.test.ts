@@ -75,7 +75,7 @@ describe("startRouter", () => {
     expect(boot.hidden).toBe(true);
     expect(boot.textContent).toBe("");
     expect(splash.hidden).toBe(false);
-    expect(splash.textContent).toBe("splash screen — TODO");
+    expect(splash.querySelector('input[name="player-name"]')).not.toBeNull();
 
     router.stop();
   });
