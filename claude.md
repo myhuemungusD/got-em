@@ -1,5 +1,12 @@
 # Got Em — Street Dice
 
+## Working principles
+
+1. Ask before assuming.
+2. Use the simplest solution first.
+3. Don't touch unrelated code.
+4. Flag uncertainty immediately.
+
 A real-time multiplayer dice game. Friends create a room, share a code or
 link, and play from their own phones. Four game modes. Casual, friends-only,
 browser-based. No app store, no accounts.
@@ -57,13 +64,6 @@ src/
 - `TEST_MODE` must be automatic (dev vs prod env), not a manual flag.
 - CI (GitHub Actions) gates every push: typecheck + lint + all tests.
 - Small verified steps. If a task spans many files at once, split it.
-
-## Working principles
-
-1. Ask before assuming.
-2. Use the simplest solution first.
-3. Don't touch unrelated code.
-4. Flag uncertainty immediately.
 
 ## Phase plan
 
