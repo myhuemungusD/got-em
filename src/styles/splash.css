@@ -1,0 +1,169 @@
+/* Splash screen — ported from prototypes/gotem.html (lines 87–138, 793–811). */
+.splash {
+  padding: 24px;
+  justify-content: center;
+  align-items: center;
+  gap: 14px;
+  text-align: center;
+  position: relative;
+}
+
+.splash::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 30%;
+  height: 1px;
+  background: var(--grad-streak);
+  pointer-events: none;
+}
+
+.splash-logo {
+  font-family: var(--font-display);
+  font-size: 84px;
+  line-height: 0.85;
+  letter-spacing: 0.08em;
+  font-weight: 400;
+  color: var(--text);
+  text-transform: uppercase;
+  text-shadow: 0 0 40px rgba(255, 107, 0, 0.3);
+}
+
+.splash-logo .accent {
+  background: var(--grad-cta);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0 24px rgba(255, 107, 0, 0.4));
+}
+
+.splash-slogan {
+  font-family: var(--font-display);
+  font-size: 11px;
+  color: var(--orange);
+  letter-spacing: 0.4em;
+  text-transform: uppercase;
+  font-weight: 400;
+}
+
+.splash-subtitle {
+  font-size: 11px;
+  color: var(--text-dim);
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  font-weight: 500;
+  margin-top: -4px;
+  margin-bottom: 8px;
+}
+
+.name-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  max-width: 340px;
+  position: relative;
+}
+
+.name-row label {
+  font-family: var(--font-display);
+  font-size: 11px;
+  color: var(--text-mute);
+  text-transform: uppercase;
+  letter-spacing: 0.25em;
+  font-weight: 400;
+}
+
+.splash-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  max-width: 340px;
+  position: relative;
+}
+
+.join-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  max-width: 340px;
+}
+
+.join-row[hidden] {
+  display: none;
+}
+
+.join-row input {
+  font-family: var(--font-display);
+  letter-spacing: 0.18em;
+  font-size: 32px;
+  text-transform: uppercase;
+}
+
+.splash-status {
+  min-height: 18px;
+  font-size: 12px;
+  color: var(--red);
+  letter-spacing: 0.05em;
+  text-align: center;
+}
+
+.invite-banner {
+  width: 100%;
+  max-width: 340px;
+  padding: 14px 16px;
+  border-radius: var(--r-md);
+  background: var(--grad-card), linear-gradient(180deg, #1a0e05 0%, var(--bg-elev-1) 100%);
+  border: 1px solid var(--orange);
+  box-shadow: var(--sh-glow-sm);
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.invite-banner[hidden] {
+  display: none;
+}
+
+.invite-banner::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: var(--grad-streak);
+}
+
+.invite-banner-label {
+  font-family: var(--font-display);
+  font-size: 11px;
+  color: var(--orange);
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  font-weight: 400;
+}
+
+.invite-banner-code {
+  font-family: var(--font-display);
+  font-size: 44px;
+  font-weight: 400;
+  letter-spacing: 0.18em;
+  color: var(--text);
+  line-height: 1;
+  margin-top: 2px;
+  text-shadow: 0 0 22px rgba(255, 107, 0, 0.5);
+}
+
+.recent-section {
+  margin-top: 8px;
+  width: 100%;
+  max-width: 340px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  position: relative;
+}

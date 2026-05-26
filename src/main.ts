@@ -1,4 +1,8 @@
-const root = document.getElementById("app");
-if (root) {
-  root.textContent = "Got Em — scaffold ready.";
-}
+import "./styles/tokens.css";
+import "./styles/splash.css";
+import { startRouter } from "./router";
+import type { Screen } from "./state";
+
+startRouter({
+  getScreenRoot: (name: Screen) => document.getElementById(`screen-${name}`),
+});

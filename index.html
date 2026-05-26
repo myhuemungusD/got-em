@@ -4,9 +4,20 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Got Em</title>
+    <style>
+      .screen[hidden] { display: none; }
+    </style>
   </head>
   <body>
-    <div id="app"></div>
+    <div id="app">
+      <section class="screen" id="screen-boot"></section>
+      <section class="screen" id="screen-setup-error" hidden></section>
+      <section class="screen" id="screen-splash" hidden></section>
+      <section class="screen" id="screen-mode-select" hidden></section>
+      <section class="screen" id="screen-lobby" hidden></section>
+      <section class="screen" id="screen-play" hidden></section>
+      <section class="screen" id="screen-gameover" hidden></section>
+    </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
