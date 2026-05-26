@@ -67,7 +67,27 @@ src/
 
 ## Phase plan
 
-0. Repo setup + restructure the prototype into typed modules.
+0. **Closed.** Repo setup + restructure the prototype into typed modules.
+   Landed: scoring port (dice + craps + clo + farkle, 53+ tests), central
+   typed `state.ts`, firebase mock + `ops.ts` façade, screen router + main
+   entry, splash screen ported, design tokens + splash CSS.
 1. Bulletproofing: strict TS, CI, env config, error boundary.
 2. **Turn timer + dead-game cleanup + reconnection** — the headline work.
 3. Polish: PWA manifest, icon, optional sound, audited states.
+
+## Phase 0 deferred
+
+Intentionally left for later chunks. Do not treat these as bugs.
+
+- Real Firestore branch in `src/firebase/ops.ts` is `NOT_IMPLEMENTED` — real
+  wiring lands together with `firestore.rules` in a later chunk. TEST_MODE
+  path is fully functional today.
+- Placeholder TODO screens: `src/screens/boot.ts`, `setup-error.ts`,
+  `mode-select.ts`, `lobby.ts`, `play.ts`, `gameover.ts` each render a stub
+  string. Only `splash.ts` is real.
+- `src/components/` exists as an empty scaffold (`src/components/index.ts`).
+  Dice, hand, and invite-modal components have not been built.
+- No CI workflow (Plan B / Phase 1 owns this).
+- No top-level error boundary on `main.ts` (Phase 1).
+- No runtime validation of `.env` values — only `.env.example` documents the
+  expected keys. `isFirebaseConfigured()` is a yes/no check, not a validator.
