@@ -58,6 +58,13 @@ src/
 - CI (GitHub Actions) gates every push: typecheck + lint + all tests.
 - Small verified steps. If a task spans many files at once, split it.
 
+## Working principles
+
+1. Ask before assuming.
+2. Use the simplest solution first.
+3. Don't touch unrelated code.
+4. Flag uncertainty immediately.
+
 ## Phase plan
 
 0. Repo setup + restructure the prototype into typed modules.
