@@ -1,4 +1,5 @@
 # got-em
+[![CI](https://github.com/myhuemungusD/got-em/actions/workflows/ci.yml/badge.svg)](https://github.com/myhuemungusD/got-em/actions/workflows/ci.yml)
 
 Single-file async street dice app (no backend). Open `index.html` in a browser and share the URL after each move.
 
