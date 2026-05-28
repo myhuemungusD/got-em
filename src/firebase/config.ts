@@ -30,7 +30,6 @@ interface ViteEnvLike {
 
 function readEnv(): ViteEnvLike {
   try {
-    // @ts-expect-error — import.meta.env is provided by the bundler
     const env = import.meta.env as ViteEnvLike | undefined;
     return env ?? {};
   } catch {
