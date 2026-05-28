@@ -2,10 +2,28 @@
 
 [![CI](https://github.com/myhuemungusD/got-em/actions/workflows/ci.yml/badge.svg)](https://github.com/myhuemungusD/got-em/actions/workflows/ci.yml)
 
-Real-time multiplayer dice game. Four modes, anonymous per-device players,
-QR/link invites, browser-only. No accounts, no app store.
+Real-time multiplayer dice game. Four modes (Craps, C-Lo, 4-5-6, 10,000),
+anonymous per-device players, QR/link invites, browser-only. No accounts,
+no app store.
 
-See `claude.md` for locked architectural decisions and the phase plan.
+See [`claude.md`](./claude.md) for locked architectural decisions and the
+full phase plan.
+
+## Status
+
+- **Phase 0** — closed. Scoring engine, central state, firebase mock + ops
+  façade, screen router, and the splash screen are ported and typed.
+- **Phase 1** — in progress. Bulletproofing: strict TS (on), CI (live),
+  env config, error boundary. Lint is a tracked follow-up.
+- **Phase 2** — turn timer, dead-game cleanup, reconnection. The headline work.
+- **Phase 3** — polish (PWA, icons, optional sound).
+
+## Stack
+
+Vite · TypeScript (strict) · Vitest · Firebase Anonymous Auth + Cloud
+Firestore · Vercel for deploy.
+
+**No** UI framework. **No** server. **No** accounts. **No** app store.
 
 ## Prerequisites
 
@@ -61,3 +79,10 @@ src/
 
 The prototype at `prototypes/gotem.html` is the source of truth being ported
 module by module. Tests stay green at every step.
+
+## Working with the dev team
+
+The repo ships with a five-agent Claude Code team in `.claude/agents/` —
+`gotem-architect`, `gotem-frontend`, `gotem-firebase`, `gotem-test`, and
+`gotem-reviewer`. See [`.claude/agents/README.md`](./.claude/agents/README.md)
+for the workflow.
