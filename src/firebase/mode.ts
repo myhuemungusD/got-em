@@ -22,7 +22,6 @@ function readEnv(): ViteEnvLike {
   // `import.meta.env` is injected by Vite/Vitest. In a plain Node context
   // (e.g. an ad-hoc script) it may be undefined — fall back to test mode.
   try {
-    // @ts-expect-error — import.meta.env is provided by the bundler
     const env = import.meta.env as ViteEnvLike | undefined;
     return env ?? {};
   } catch {
