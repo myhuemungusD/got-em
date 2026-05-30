@@ -1,6 +1,22 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { installErrorBoundary } from "./error-boundary";
 
+type OnError = (message: string) => void;
+
+if (typeof globalThis.PromiseRejectionEvent === "undefined") {
+  class PromiseRejectionEventPolyfill extends Event {
+    readonly reason: unknown;
+    readonly promise: Promise<unknown>;
+    constructor(type: string, init: PromiseRejectionEventInit) {
+      super(type);
+      this.reason = init.reason;
+      this.promise = init.promise;
+    }
+  }
+  (globalThis as { PromiseRejectionEvent: unknown }).PromiseRejectionEvent =
+    PromiseRejectionEventPolyfill;
+}
+
 function dispatchErrorEvent(opts: { message?: string; error?: Error | null }): void {
   const init: ErrorEventInit = {
     message: opts.message ?? "",
@@ -23,11 +39,11 @@ function dispatchRejectionEvent(reason: unknown): void {
 }
 
 describe("installErrorBoundary - window error events", () => {
-  let onError: ReturnType<typeof vi.fn>;
+  let onError: ReturnType<typeof vi.fn<OnError>>;
   let uninstall: () => void;
 
   beforeEach(() => {
-    onError = vi.fn();
+    onError = vi.fn<OnError>();
     uninstall = installErrorBoundary({ onError }).uninstall;
   });
 
@@ -55,11 +71,11 @@ describe("installErrorBoundary - window error events", () => {
 });
 
 describe("installErrorBoundary - unhandled promise rejections", () => {
-  let onError: ReturnType<typeof vi.fn>;
+  let onError: ReturnType<typeof vi.fn<OnError>>;
   let uninstall: () => void;
 
   beforeEach(() => {
-    onError = vi.fn();
+    onError = vi.fn<OnError>();
     uninstall = installErrorBoundary({ onError }).uninstall;
   });
 
@@ -88,7 +104,7 @@ describe("installErrorBoundary - unhandled promise rejections", () => {
 
 describe("installErrorBoundary - uninstall", () => {
   it("stops calling onError after uninstall for error events", () => {
-    const onError = vi.fn();
+    const onError = vi.fn<OnError>();
     const { uninstall } = installErrorBoundary({ onError });
     uninstall();
     dispatchErrorEvent({ message: "ignored", error: new Error("ignored") });
@@ -96,7 +112,7 @@ describe("installErrorBoundary - uninstall", () => {
   });
 
   it("stops calling onError after uninstall for unhandledrejection events", () => {
-    const onError = vi.fn();
+    const onError = vi.fn<OnError>();
     const { uninstall } = installErrorBoundary({ onError });
     uninstall();
     dispatchRejectionEvent(new Error("ignored-async"));
