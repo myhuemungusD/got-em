@@ -16,10 +16,6 @@ describe("state", () => {
   it("uses the prototype's defaults for mode and player count", () => {
     expect(state.selectedMode).toBe("craps");
     expect(state.selectedPlayerCount).toBe(2);
-    expect(state.pendingTen10kSelection).toEqual([]);
-    expect(state.isAnimatingRoll).toBe(false);
-    expect(state.lastSeenRollId).toBeNull();
-    expect(state.lastConfig).toBeNull();
   });
 
   it("setState shallow-merges and leaves unrelated fields untouched", () => {
@@ -57,13 +53,6 @@ describe("state", () => {
     setState({ currentRoom: "ABCD" });
     expect(a).toHaveBeenCalledTimes(2);
     expect(b).toHaveBeenCalledTimes(2);
-  });
-
-  it("replaces nested fields by reference (shallow merge semantics)", () => {
-    setState({ pendingTen10kSelection: [0, 2] });
-    expect(state.pendingTen10kSelection).toEqual([0, 2]);
-    setState({ pendingTen10kSelection: [] });
-    expect(state.pendingTen10kSelection).toEqual([]);
   });
 
   it("can hold a full GameState patch", () => {

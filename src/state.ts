@@ -66,11 +66,6 @@ export interface GameState {
   ten?: TenState;
 }
 
-export interface LastConfig {
-  mode: GameMode;
-  numPlayers: number;
-}
-
 export interface AppState {
   screen: Screen;
   myUid: string | null;
@@ -79,10 +74,6 @@ export interface AppState {
   game: GameState | null;
   selectedMode: GameMode;
   selectedPlayerCount: number;
-  lastConfig: LastConfig | null;
-  pendingTen10kSelection: number[];
-  lastSeenRollId: string | null;
-  isAnimatingRoll: boolean;
   lastError: string | null;
 }
 
@@ -94,10 +85,6 @@ const initialState: AppState = {
   game: null,
   selectedMode: "craps",
   selectedPlayerCount: 2,
-  lastConfig: null,
-  pendingTen10kSelection: [],
-  lastSeenRollId: null,
-  isAnimatingRoll: false,
   lastError: null,
 };
 
