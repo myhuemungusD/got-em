@@ -61,6 +61,12 @@ export interface GameState {
   lastResult: RollResult | null;
   lastRollId: string | null;
   lastRolledBy: string | null;
+  /** ms epoch the current turn started; `null` unless `status === "in_progress"`. */
+  turnStartedAt: number | null;
+  /** ms epoch by which the current player must act; `null` unless `status === "in_progress"`. */
+  turnDeadline: number | null;
+  /** Per-game turn budget in ms. Defaults to 30000. */
+  turnDurationMs: number;
   craps?: CrapsState;
   matchup?: MatchupState;
   ten?: TenState;

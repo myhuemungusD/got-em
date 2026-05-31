@@ -8,6 +8,7 @@ export {
   createRoom,
   joinRoom,
   startGame,
+  advanceTurn,
   leaveGame,
   readGame,
   subscribeGame,
@@ -18,6 +19,7 @@ export type {
   CreateRoomInput,
   JoinRoomInput,
   StartGameInput,
+  AdvanceTurnInput,
   LeaveGameInput,
 } from "./ops";
 

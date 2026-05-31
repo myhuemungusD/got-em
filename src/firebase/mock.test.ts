@@ -48,6 +48,9 @@ describe("createRoom", () => {
     expect(stored.slots[1].uid).toBeNull();
     expect(stored.playerUids).toEqual(["u1"]);
     expect(stored.craps).toEqual({ phase: "comeout", point: null });
+    expect(stored.turnStartedAt).toBeNull();
+    expect(stored.turnDeadline).toBeNull();
+    expect(stored.turnDurationMs).toBe(30000);
   });
 
   it("seeds mode-specific substate", async () => {
@@ -113,6 +116,10 @@ describe("joinRoom", () => {
     await joinRoom({ code, slotIdx: 1, uid: "u2", name: "B" });
     const doc = (await readGame(code)) as GameDoc;
     expect(doc.status).toBe("in_progress");
+    expect(doc.turnStartedAt).not.toBeNull();
+    expect(doc.turnDeadline).toBe(
+      (doc.turnStartedAt as number) + doc.turnDurationMs,
+    );
   });
 
   it("is idempotent for a player already in the room", async () => {
@@ -176,6 +183,10 @@ describe("startGame", () => {
     expect(doc.numSlots).toBe(2);
     expect(doc.slots.map((s) => s.uid)).toEqual(["u1", "u3"]);
     expect(doc.playerUids).toEqual(["u1", "u3"]);
+    expect(doc.turnStartedAt).not.toBeNull();
+    expect(doc.turnDeadline).toBe(
+      (doc.turnStartedAt as number) + doc.turnDurationMs,
+    );
   });
 
   it("rejects non-host", async () => {

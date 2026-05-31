@@ -129,6 +129,9 @@ export async function createRoom(input: CreateRoomInput): Promise<string> {
         lastResult: null,
         lastRollId: null,
         lastRolledBy: null,
+        turnStartedAt: null,
+        turnDeadline: null,
+        turnDurationMs: 30000,
         createdAt: nowTs(),
         updatedAt: nowTs(),
         ...modeInit(mode),
@@ -172,12 +175,18 @@ export async function joinRoom(input: JoinRoomInput): Promise<void> {
     newSlots[input.slotIdx] = { ...slot, uid: input.uid, name: input.name };
     const newPlayerUids = [...g.playerUids, input.uid];
     const allFilled = newSlots.every((s) => s.uid);
-    tx.update(ref, {
+    const ts = nowTs();
+    const patch: Partial<GameDoc> & Record<string, unknown> = {
       slots: newSlots,
       playerUids: newPlayerUids,
       status: allFilled ? "in_progress" : "waiting",
-      updatedAt: nowTs(),
-    });
+      updatedAt: ts,
+    };
+    if (allFilled) {
+      patch.turnStartedAt = ts;
+      patch.turnDeadline = ts + g.turnDurationMs;
+    }
+    tx.update(ref, patch);
   });
 }
 
@@ -200,12 +209,50 @@ export async function startGame(input: StartGameInput): Promise<void> {
     if (g.status !== "waiting") return;
     const filled = g.slots.filter((s) => s.uid);
     if (filled.length < 2) throw new Error("TOO_FEW_PLAYERS");
+    const startedAt = nowTs();
     tx.update(ref, {
       slots: filled,
       numSlots: filled.length,
       playerUids: filled.map((s) => s.uid as string),
       status: "in_progress",
-      updatedAt: nowTs(),
+      turnStartedAt: startedAt,
+      turnDeadline: startedAt + g.turnDurationMs,
+      updatedAt: startedAt,
+    });
+  });
+}
+
+export interface AdvanceTurnInput {
+  code: string;
+  byUid: string;
+}
+
+/**
+ * Rotate `current` to the next slot and stamp the turn deadline. Only the
+ * player whose turn it currently is may call this. Mode-specific cleanup
+ * (craps point reset, ten banking, etc.) is NOT performed here — that ports
+ * later with the play screen. This op is the substrate for Phase 2's turn
+ * timer + reconnection work.
+ *
+ * Note: `turnDeadline` is a client-computed `Date.now() + duration`. Real
+ * Firestore's `serverTimestamp()` sentinel cannot be used in arithmetic, so
+ * we accept small clock-skew on the deadline.
+ *
+ * Throws stable strings: `ROOM_NOT_FOUND`, `NOT_IN_PROGRESS`, `NOT_YOUR_TURN`.
+ */
+export async function advanceTurn(input: AdvanceTurnInput): Promise<void> {
+  await updateGameTx(input.code, (g, commit) => {
+    if (g.status !== "in_progress") throw new Error("NOT_IN_PROGRESS");
+    const currentSlot = g.slots[g.current];
+    if (!currentSlot || currentSlot.uid !== input.byUid) {
+      throw new Error("NOT_YOUR_TURN");
+    }
+    const nextCurrent = (g.current + 1) % g.numSlots;
+    const startedAt = nowTs();
+    commit({
+      current: nextCurrent,
+      turnStartedAt: startedAt,
+      turnDeadline: startedAt + g.turnDurationMs,
     });
   });
 }
