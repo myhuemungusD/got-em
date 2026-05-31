@@ -44,6 +44,7 @@ describe("createRoom", () => {
       name: "Alice",
       score: 0,
       onBoard: false,
+      chips: 100,
     });
     expect(stored.slots[1]!.uid).toBeNull();
     expect(stored.playerUids).toEqual(["u1"]);
@@ -51,6 +52,21 @@ describe("createRoom", () => {
     expect(stored.turnStartedAt).toBeNull();
     expect(stored.turnDeadline).toBeNull();
     expect(stored.turnDurationMs).toBe(30000);
+  });
+
+  it("seeds every slot with the starting chip stack and no locked wager", async () => {
+    const code = await createRoom({
+      mode: "craps",
+      numPlayers: 3,
+      hostUid: "u1",
+      hostName: "Alice",
+    });
+    const stored = (await readGame(code)) as GameDoc;
+    expect(stored.wager).toBeNull();
+    expect(stored.slots).toHaveLength(3);
+    for (const slot of stored.slots) {
+      expect(slot.chips).toBe(100);
+    }
   });
 
   it("seeds mode-specific substate", async () => {
@@ -101,6 +117,7 @@ describe("joinRoom", () => {
       name: "Bob",
       score: 0,
       onBoard: false,
+      chips: 100,
     });
     expect(doc.playerUids).toEqual(["u1", "u2"]);
     expect(doc.status).toBe("waiting");

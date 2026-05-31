@@ -66,8 +66,8 @@ describe("state", () => {
         hostUid: "u1",
         numSlots: 2,
         slots: [
-          { uid: "u1", name: "Ace", score: 0, onBoard: false },
-          { uid: "u2", name: "Blaze", score: 0, onBoard: false },
+          { uid: "u1", name: "Ace", score: 0, onBoard: false, chips: 100 },
+          { uid: "u2", name: "Blaze", score: 0, onBoard: false, chips: 100 },
         ],
         playerUids: ["u1", "u2"],
         current: 0,
@@ -80,6 +80,7 @@ describe("state", () => {
         turnStartedAt: null,
         turnDeadline: null,
         turnDurationMs: 30000,
+        wager: null,
         craps: { phase: "comeout", point: null },
       },
     });

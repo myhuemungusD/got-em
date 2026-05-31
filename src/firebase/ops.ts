@@ -24,6 +24,7 @@ import type {
   Slot,
   Unsubscribe,
   TxFn,
+  WagerPot,
 } from "./types";
 
 /* -------------------------------------------------------------------- */
@@ -57,6 +58,9 @@ function nowTs(): number {
 /* Code + slot helpers (ported from prototype)                          */
 /* -------------------------------------------------------------------- */
 
+/** Starting virtual chip stack seeded into every slot at room creation. */
+export const STARTING_CHIPS = 100;
+
 const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
 export function genCode(len = 4): string {
@@ -73,6 +77,7 @@ function emptySlots(num: number, hostUid: string, hostName: string): Slot[] {
     name: i === 0 ? hostName : "",
     score: 0,
     onBoard: false,
+    chips: STARTING_CHIPS,
   }));
 }
 
@@ -132,6 +137,7 @@ export async function createRoom(input: CreateRoomInput): Promise<string> {
         turnStartedAt: null,
         turnDeadline: null,
         turnDurationMs: 30000,
+        wager: null,
         createdAt: nowTs(),
         updatedAt: nowTs(),
         ...modeInit(mode),
@@ -257,6 +263,110 @@ export async function advanceTurn(input: AdvanceTurnInput): Promise<void> {
   });
 }
 
+export interface LockWagersInput {
+  code: string;
+  hostUid: string;
+  amount: number;
+}
+
+/**
+ * Host locks a per-player buy-in for the room while still in the lobby.
+ * Deducts `amount` from every occupied slot's chip stack and builds the
+ * room-local pot embedded on the game doc. Idempotency is enforced by the
+ * `wager === null` guard — a second lock attempt throws `WAGER_LOCKED`.
+ *
+ * Asserts (in order): room exists, caller is host, status is "waiting",
+ * no wager already locked, and every seated player can afford `amount`.
+ */
+export async function lockWagers(input: LockWagersInput): Promise<void> {
+  await updateGameTx(input.code, (g, commit) => {
+    if (g.hostUid !== input.hostUid) throw new Error("NOT_HOST");
+    if (g.status !== "waiting") throw new Error("ALREADY_STARTED");
+    if (g.wager !== null) throw new Error("WAGER_LOCKED");
+    if (input.amount < 0) throw new Error("INSUFFICIENT_CHIPS");
+
+    const occupied = g.slots.filter((s) => s.uid !== null);
+    if (occupied.some((s) => s.chips < input.amount)) {
+      throw new Error("INSUFFICIENT_CHIPS");
+    }
+
+    const newSlots = g.slots.map((s) =>
+      s.uid !== null ? { ...s, chips: s.chips - input.amount } : s,
+    );
+    const contributions: Record<string, number> = {};
+    for (const s of occupied) {
+      contributions[s.uid as string] = input.amount;
+    }
+    const wager = {
+      amount: input.amount,
+      contributions,
+      total: input.amount * occupied.length,
+      settled: false,
+      paidTo: null,
+    };
+    commit({ slots: newSlots, wager });
+  });
+}
+
+export interface SettlePotInput {
+  code: string;
+}
+
+/**
+ * Pay the locked pot to the game's winner once the game is finished.
+ * Idempotent: a second call after settlement throws `ALREADY_SETTLED`,
+ * which is the double-payout guard.
+ *
+ * Asserts (in order): room exists, a wager is locked, not already settled,
+ * status is "finished", and a winner is recorded.
+ */
+export async function settlePot(input: SettlePotInput): Promise<void> {
+  await updateGameTx(input.code, (g, commit) => {
+    const pot = g.wager;
+    if (pot === null) throw new Error("WAGER_NOT_LOCKED");
+    if (pot.settled) throw new Error("ALREADY_SETTLED");
+    if (g.status !== "finished") throw new Error("INVALID_SETTLEMENT");
+    if (g.winner === null) throw new Error("INVALID_SETTLEMENT");
+
+    const winner = g.winner;
+    const newSlots = g.slots.map((s) =>
+      s.uid === winner ? { ...s, chips: s.chips + pot.total } : s,
+    );
+    const wager: WagerPot = { ...pot, settled: true, paidTo: winner };
+    commit({ slots: newSlots, wager });
+  });
+}
+
+export interface RefundWagersInput {
+  code: string;
+}
+
+/**
+ * Return every contribution to its contributor (Phase 2 dead-game cleanup).
+ * The pot is preserved (not nulled) but marked `settled = true` with
+ * `paidTo = null`, so the same idempotency guard that protects settlePot
+ * also blocks a double-refund.
+ *
+ * Asserts (in order): room exists, a wager is locked, not already settled,
+ * and the game is NOT finished (a finished game is settlePot's job).
+ */
+export async function refundWagers(input: RefundWagersInput): Promise<void> {
+  await updateGameTx(input.code, (g, commit) => {
+    const pot = g.wager;
+    if (pot === null) throw new Error("WAGER_NOT_LOCKED");
+    if (pot.settled) throw new Error("ALREADY_SETTLED");
+    if (g.status === "finished") throw new Error("INVALID_SETTLEMENT");
+
+    const newSlots = g.slots.map((s) => {
+      if (s.uid === null) return s;
+      const back = pot.contributions[s.uid];
+      return back ? { ...s, chips: s.chips + back } : s;
+    });
+    const wager: WagerPot = { ...pot, settled: true, paidTo: null };
+    commit({ slots: newSlots, wager });
+  });
+}
+
 export interface LeaveGameInput {
   code: string;
   uid: string;
@@ -277,7 +387,13 @@ export async function leaveGame(input: LeaveGameInput): Promise<void> {
     const slotIdx = g.slots.findIndex((s) => s.uid === input.uid);
     if (slotIdx < 0) return;
     const newSlots = [...g.slots];
-    newSlots[slotIdx] = { uid: null, name: "", score: 0, onBoard: false };
+    newSlots[slotIdx] = {
+      uid: null,
+      name: "",
+      score: 0,
+      onBoard: false,
+      chips: STARTING_CHIPS,
+    };
     const newPlayerUids = g.playerUids.filter((u) => u !== input.uid);
     let newHost = g.hostUid;
     if (g.hostUid === input.uid && newPlayerUids.length > 0) {

@@ -18,6 +18,15 @@ export interface Slot {
   name: string;
   score: number;
   onBoard: boolean;
+  chips: number; // remaining virtual stack
+}
+
+export interface WagerPot {
+  amount: number; // per-player buy-in, locked at game start
+  contributions: Record<string, number>; // uid -> chips committed
+  total: number; // sum of contributions
+  settled: boolean;
+  paidTo: string | null; // winner uid after settle
 }
 
 export interface CrapsState {
@@ -67,6 +76,7 @@ export interface GameState {
   turnDeadline: number | null;
   /** Per-game turn budget in ms. Defaults to 30000. */
   turnDurationMs: number;
+  wager: WagerPot | null; // null = no-wager game (backwards-compat)
   craps?: CrapsState;
   matchup?: MatchupState;
   ten?: TenState;
@@ -80,6 +90,8 @@ export interface AppState {
   game: GameState | null;
   selectedMode: GameMode;
   selectedPlayerCount: number;
+  proposedWager: number; // host's lobby input; default 0
+  selectedStartingChips: number; // default 100
   lastError: string | null;
 }
 
@@ -91,6 +103,8 @@ const initialState: AppState = {
   game: null,
   selectedMode: "craps",
   selectedPlayerCount: 2,
+  proposedWager: 0,
+  selectedStartingChips: 100,
   lastError: null,
 };
 
