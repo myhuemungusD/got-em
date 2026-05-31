@@ -1,0 +1,170 @@
+/* Gameover screen — ported from prototypes/gotem.html (lines 571–621, 926–937). */
+.gameover {
+  padding: 24px 20px;
+  justify-content: center;
+  align-items: center;
+  gap: 14px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.gameover::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 50% 40%, rgba(255, 107, 0, 0.18) 0%, transparent 50%),
+    radial-gradient(circle at 50% 60%, rgba(255, 61, 0, 0.1) 0%, transparent 60%);
+  pointer-events: none;
+}
+
+.winner-trophy {
+  font-size: 72px;
+  line-height: 1;
+  filter: drop-shadow(0 0 24px rgba(255, 193, 7, 0.6));
+  animation: trophyBob 2.4s ease-in-out infinite;
+  position: relative;
+  z-index: 1;
+}
+
+@keyframes trophyBob {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-3deg);
+  }
+  50% {
+    transform: translateY(-8px) rotate(3deg);
+  }
+}
+
+.winner-label {
+  font-family: var(--font-display);
+  font-size: 14px;
+  color: var(--orange-light);
+  letter-spacing: 0.4em;
+  text-transform: uppercase;
+  font-weight: 400;
+  margin-top: -4px;
+  position: relative;
+  z-index: 1;
+}
+
+.winner-name {
+  font-family: var(--font-display);
+  font-size: 64px;
+  line-height: 0.9;
+  letter-spacing: 0.05em;
+  font-weight: 400;
+  background: var(--grad-win);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-transform: uppercase;
+  text-shadow: 0 0 40px rgba(255, 107, 0, 0.5);
+  position: relative;
+  z-index: 1;
+  word-break: break-word;
+}
+
+.winner-streak {
+  width: 80%;
+  max-width: 300px;
+  height: 2px;
+  background: var(--grad-streak);
+  margin: 8px 0;
+  position: relative;
+  z-index: 1;
+}
+
+.final-score {
+  width: 100%;
+  max-width: 340px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+  position: relative;
+  z-index: 1;
+}
+
+.final-score-label {
+  font-family: var(--font-display);
+  font-size: 11px;
+  color: var(--text-mute);
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  text-align: center;
+  margin-bottom: 4px;
+  font-weight: 400;
+}
+
+.final-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  background: var(--bg-elev-1);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+}
+
+.final-row.winner {
+  border-color: var(--green);
+  background: linear-gradient(90deg, #082818 0%, var(--bg-elev-1) 100%);
+  box-shadow: var(--sh-glow-green);
+}
+
+.final-row-rank {
+  font-family: var(--font-display);
+  font-size: 14px;
+  color: var(--text-mute);
+  letter-spacing: 0.15em;
+  width: 30px;
+  font-weight: 400;
+}
+
+.final-row.winner .final-row-rank {
+  color: var(--green);
+}
+
+.final-row-name {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.final-row-score {
+  font-family: var(--font-display);
+  font-size: 22px;
+  color: var(--text);
+  letter-spacing: 0.05em;
+  font-variant-numeric: tabular-nums;
+  font-weight: 400;
+}
+
+.final-row.winner .final-row-score {
+  color: var(--green);
+}
+
+.gameover-actions {
+  width: 100%;
+  max-width: 340px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 14px;
+  position: relative;
+  z-index: 1;
+}
+
+@media (max-height: 700px) {
+  .winner-name {
+    font-size: 48px;
+  }
+}
