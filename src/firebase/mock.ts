@@ -131,7 +131,7 @@ export function runTransaction<R>(_db: unknown, fn: TxFn<R>): Promise<R> {
         notify(ref.path);
       },
       set: (ref, data) => {
-        store.set(ref.path, clone(data as unknown as AnyData));
+        store.set(ref.path, { ...clone(data) });
         notify(ref.path);
       },
       delete: (ref) => {
