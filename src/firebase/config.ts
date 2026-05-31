@@ -56,3 +56,36 @@ export function isFirebaseConfigured(): boolean {
       firebaseConfig.appId,
   );
 }
+
+/**
+ * Every `VITE_FIREBASE_*` key required to initialize the real Firebase app.
+ * All six are required for a real deploy — unlike `isFirebaseConfigured()`
+ * (a cheap minimum-keys yes/no), `validateConfig()` reports EXACTLY which
+ * keys are missing so a misconfigured prod build can route to the
+ * setup-error screen with a precise diagnostic instead of crashing
+ * cryptically deep inside the SDK.
+ */
+const REQUIRED_KEYS: readonly (keyof FirebaseConfig)[] = [
+  "apiKey",
+  "authDomain",
+  "projectId",
+  "storageBucket",
+  "messagingSenderId",
+  "appId",
+];
+
+/**
+ * Runtime validator used at real-mode startup. Returns `{ ok: true }` when
+ * every required key is present and non-empty, otherwise
+ * `{ ok: false, missing: [...] }` listing the empty/absent keys (in the
+ * canonical order above). Pure — does not initialize Firebase.
+ */
+export function validateConfig():
+  | { ok: true }
+  | { ok: false; missing: string[] } {
+  const missing = REQUIRED_KEYS.filter(
+    (k) => !firebaseConfig[k] || firebaseConfig[k].trim() === "",
+  );
+  if (missing.length === 0) return { ok: true };
+  return { ok: false, missing };
+}

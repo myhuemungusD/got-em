@@ -40,7 +40,7 @@ export {
 export type { RollInput, TenKeepInput } from "./gameplay";
 
 export { TEST_MODE } from "./mode";
-export { firebaseConfig, isFirebaseConfigured } from "./config";
+export { firebaseConfig, isFirebaseConfigured, validateConfig } from "./config";
 export type { FirebaseConfig } from "./config";
 
 export type {
