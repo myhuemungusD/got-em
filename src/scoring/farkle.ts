@@ -10,7 +10,7 @@ export function ten10kScoreCombo(values: readonly number[]): FarkleScore {
   values.forEach((v) => counts[v]!++);
 
   let score = 0;
-  const used: boolean[] = new Array(values.length).fill(false);
+  const used: boolean[] = Array.from({ length: values.length }, () => false);
 
   for (let v = 1; v <= 6; v++) {
     if (counts[v]! === 6) {

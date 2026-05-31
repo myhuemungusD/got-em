@@ -49,7 +49,6 @@ function notify(path: string): void {
       cb(snap);
     } catch (e) {
       // Listener errors should not break other listeners.
-      // eslint-disable-next-line no-console
       console.error("[mock] listener threw", e);
     }
   }
@@ -61,27 +60,29 @@ export function doc(_db: unknown, col: string, id: string): DocRef {
   return { path: `${col}/${id}` };
 }
 
-export async function setDoc<T extends AnyData>(
+export function setDoc<T extends AnyData>(
   ref: DocRef,
   data: T,
 ): Promise<void> {
   store.set(ref.path, clone(data));
   notify(ref.path);
+  return Promise.resolve();
 }
 
-export async function getDoc<T = AnyData>(
+export function getDoc<T = AnyData>(
   ref: DocRef,
 ): Promise<DocSnapshot<T>> {
-  return snapOf<T>(ref.path);
+  return Promise.resolve(snapOf<T>(ref.path));
 }
 
-export async function updateDoc(
+export function updateDoc(
   ref: DocRef,
   patch: AnyData,
 ): Promise<void> {
   const cur = store.get(ref.path) ?? {};
   store.set(ref.path, { ...clone(cur), ...clone(patch) });
   notify(ref.path);
+  return Promise.resolve();
 }
 
 export function onSnapshot<T = AnyData>(
@@ -120,8 +121,8 @@ let txChain: Promise<unknown> = Promise.resolve();
 export function runTransaction<R>(_db: unknown, fn: TxFn<R>): Promise<R> {
   const next = txChain.then(async () => {
     const tx: Tx = {
-      get: async <T = GameDoc>(ref: DocRef): Promise<DocSnapshot<T>> =>
-        snapOf<T>(ref.path),
+      get: <T = GameDoc>(ref: DocRef): Promise<DocSnapshot<T>> =>
+        Promise.resolve(snapOf<T>(ref.path)),
       update: (ref, patch) => {
         const cur = store.get(ref.path) ?? {};
         store.set(ref.path, {
@@ -147,7 +148,7 @@ export function runTransaction<R>(_db: unknown, fn: TxFn<R>): Promise<R> {
     () => undefined,
     () => undefined,
   );
-  return next as Promise<R>;
+  return next;
 }
 
 /* ---------- test helpers (NOT exported from index) ---------- */

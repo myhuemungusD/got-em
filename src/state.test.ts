@@ -32,6 +32,7 @@ describe("state", () => {
     subscribe(fn);
     setState({ screen: "splash" });
     expect(fn).toHaveBeenCalledTimes(1);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access -- vi.fn call args are typed as any[]; runtime shape is known.
     expect(fn.mock.calls[0]?.[0].screen).toBe("splash");
   });
 
