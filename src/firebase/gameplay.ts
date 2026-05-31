@@ -5,6 +5,8 @@
  *   - rollCraps        ~1645–1672
  *   - rollClo / s456   ~1674–1708 (one engine; `mode` only selects scoring)
  *   - rollTen          ~1710–1735
+ *   - bankTen          ~1762–1792
+ *   - rollAgainTen     ~1794–1841
  *
  * Every mutation flows through `updateGameTx` (the sanctioned transactional
  * reducer in ops.ts) — never a raw setDoc/updateDoc. Dice are rolled INSIDE
@@ -28,6 +30,8 @@ import { ten10kScoreCombo } from "../scoring/farkle";
 /* -------------------------------------------------------------------- */
 
 const CRAPS_TARGET = 3;
+const TEN_TARGET = 10000;
+const TEN_ONBOARD_MIN = 1000;
 
 /* -------------------------------------------------------------------- */
 /* Local helpers                                                        */
@@ -104,6 +108,13 @@ function rollMeta(
 export interface RollInput {
   code: string;
   byUid: string;
+}
+
+export interface TenKeepInput {
+  code: string;
+  byUid: string;
+  /** Indices into `ten.rolledThisStep` the player wants to keep. */
+  keep: number[];
 }
 
 /* -------------------------------------------------------------------- */
@@ -296,6 +307,141 @@ export async function rollTen(input: RollInput): Promise<void> {
     commit({
       ...rollMeta(roll, { outcome: "rolled", label: "" }, input.byUid),
       ten: { ...t, rolledThisStep: roll, mustChoose: true },
+      ...turnStamps(g),
+    });
+  });
+}
+
+/* -------------------------------------------------------------------- */
+/* 10,000 — bank / roll-again                                           */
+/* -------------------------------------------------------------------- */
+
+/**
+ * Validate a keep-selection against the current `ten.rolledThisStep`.
+ * Throws `ALL_KEPT_MUST_SCORE` for an empty/out-of-range/duplicate selection,
+ * `NOT_SCORING_SET` if the kept values don't form a non-zero scoring set, and
+ * `ALL_KEPT_MUST_SCORE` again if some kept die is dead weight (doesn't score).
+ * Returns the score earned by the kept values. Mirrors `validateTenSelection`
+ * (~1750–1760) but throws stable codes instead of returning a UI message.
+ */
+function validateKeep(t: GameDoc["ten"], keep: number[]): number {
+  const rolled = t?.rolledThisStep ?? [];
+  if (keep.length === 0) throw new Error("ALL_KEPT_MUST_SCORE");
+  const seen = new Set<number>();
+  for (const i of keep) {
+    if (!Number.isInteger(i) || i < 0 || i >= rolled.length || seen.has(i)) {
+      throw new Error("ALL_KEPT_MUST_SCORE");
+    }
+    seen.add(i);
+  }
+  const values = keep.map((i) => rolled[i]!);
+  const { score, used } = ten10kScoreCombo(values);
+  if (score === 0) throw new Error("NOT_SCORING_SET");
+  if (!used.every(Boolean)) throw new Error("ALL_KEPT_MUST_SCORE");
+  return score;
+}
+
+const TEN_RESET = {
+  turnScore: 0,
+  kept: [] as number[],
+  rolledThisStep: [] as number[],
+  mustChoose: false,
+};
+
+/**
+ * Bank the current turn: validate the keep, add its score to `turnScore`, then
+ * commit it to the slot. If the player is not yet on the board the running
+ * total must reach 1000 (`NEED_1000`) or the bank is rejected (no state
+ * change). On a valid bank: slot.score += turnScore (capped at the target),
+ * `onBoard = true`, ten state resets, and the game finishes if the slot reaches
+ * 10,000 — otherwise the turn advances. Port of `ten10kBank` (~1762–1792).
+ */
+export async function bankTen(input: TenKeepInput): Promise<void> {
+  await updateGameTx(input.code, (g, commit) => {
+    const slot = assertTurn(g, input.byUid);
+    const t = g.ten;
+    const score = validateKeep(t, input.keep);
+    const turnScore = (t?.turnScore ?? 0) + score;
+
+    if (!slot.onBoard && turnScore < TEN_ONBOARD_MIN) {
+      throw new Error("NEED_1000");
+    }
+
+    const slots = [...g.slots];
+    const newScore = slot.score + turnScore;
+    slots[g.current] = {
+      ...slot,
+      score: Math.min(newScore, TEN_TARGET),
+      onBoard: true,
+    };
+    const meta = rollMeta(
+      g.lastRoll ?? [],
+      { outcome: "banked", sum: turnScore },
+      input.byUid,
+    );
+
+    if (newScore >= TEN_TARGET) {
+      commit({
+        ...meta,
+        slots,
+        ten: { ...TEN_RESET },
+        status: "finished",
+        winner: slot.uid,
+      });
+      return;
+    }
+    commit({
+      ...meta,
+      slots,
+      ten: { ...TEN_RESET },
+      current: nextCurrent(g),
+      ...turnStamps(g),
+    });
+  });
+}
+
+/**
+ * Keep some scoring dice and roll the rest, same turn. Validate the keep, add
+ * its score to `turnScore`, then reroll the (6 - kept) remaining dice. If all 6
+ * dice end up kept it's Hot Dice — reroll all 6 fresh with the accrued
+ * turnScore carried. If the reroll Farkles, forfeit `turnScore` and advance;
+ * otherwise flag `mustChoose` again. Port of `ten10kRollAgain` (~1794–1841).
+ */
+export async function rollAgainTen(input: TenKeepInput): Promise<void> {
+  await updateGameTx(input.code, (g, commit) => {
+    assertTurn(g, input.byUid);
+    const t = g.ten;
+    const score = validateKeep(t, input.keep);
+
+    const keptValues = input.keep.map((i) => t!.rolledThisStep[i]!);
+    let kept = [...(t?.kept ?? []), ...keptValues];
+    const newTurnScore = (t?.turnScore ?? 0) + score;
+
+    // Hot dice: all six kept → reroll all six fresh.
+    if (kept.length === 6) kept = [];
+
+    const numToRoll = 6 - kept.length;
+    const roll = rollN(numToRoll);
+    const { score: maxScore } = ten10kScoreCombo(roll);
+
+    if (maxScore === 0) {
+      commit({
+        ...rollMeta(roll, { outcome: "farkle", label: "FARKLE" }, input.byUid),
+        ten: { ...TEN_RESET },
+        current: nextCurrent(g),
+        ...turnStamps(g),
+      });
+      return;
+    }
+
+    commit({
+      ...rollMeta(roll, { outcome: "rolled", label: "" }, input.byUid),
+      ten: {
+        turnScore: newTurnScore,
+        kept,
+        rolledThisStep: roll,
+        mustChoose: true,
+      },
       ...turnStamps(g),
     });
   });

@@ -6,7 +6,13 @@ import {
   readGame,
   updateGameTx,
 } from "./index";
-import { rollCraps, rollClo, rollTen } from "./gameplay";
+import {
+  rollCraps,
+  rollClo,
+  rollTen,
+  bankTen,
+  rollAgainTen,
+} from "./gameplay";
 import { __resetMock } from "./mock";
 import { setDieSource, resetDieSource } from "../scoring/dice";
 import type { GameDoc, GameMode } from "./types";
@@ -264,5 +270,151 @@ describe("rollTen", () => {
     expect(g.ten?.mustChoose).toBe(true);
     expect(g.ten?.rolledThisStep).toEqual([1, 5, 2, 3, 4, 6]);
     expect(g.current).toBe(0); // same turn
+  });
+});
+
+/* ================================================================ */
+/* 10,000 — bankTen                                                 */
+/* ================================================================ */
+
+describe("bankTen", () => {
+  it("rejects an empty selection", async () => {
+    const code = await makeGame("ten");
+    queueDice(1, 5, 2, 3, 4, 6);
+    await rollTen({ code, byUid: "u1" });
+    await expect(bankTen({ code, byUid: "u1", keep: [] })).rejects.toThrow(
+      "ALL_KEPT_MUST_SCORE",
+    );
+  });
+
+  it("rejects a non-scoring kept die (NOT_SCORING_SET)", async () => {
+    const code = await makeGame("ten");
+    queueDice(1, 5, 2, 3, 4, 6);
+    await rollTen({ code, byUid: "u1" });
+    // index 2 is the value 2 -> not a scoring set on its own
+    await expect(bankTen({ code, byUid: "u1", keep: [2] })).rejects.toThrow(
+      "NOT_SCORING_SET",
+    );
+  });
+
+  it("rejects a mixed selection where one die is dead weight", async () => {
+    const code = await makeGame("ten");
+    queueDice(1, 5, 2, 3, 4, 6);
+    await rollTen({ code, byUid: "u1" });
+    // keep a 1 (scores) and a 2 (doesn't) -> ALL_KEPT_MUST_SCORE
+    await expect(bankTen({ code, byUid: "u1", keep: [0, 2] })).rejects.toThrow(
+      "ALL_KEPT_MUST_SCORE",
+    );
+  });
+
+  it("blocks a first bank below 1000 (NEED_1000)", async () => {
+    const code = await makeGame("ten");
+    queueDice(5, 2, 2, 3, 4, 6); // a single 5 scores 50
+    await rollTen({ code, byUid: "u1" });
+    await expect(bankTen({ code, byUid: "u1", keep: [0] })).rejects.toThrow(
+      "NEED_1000",
+    );
+  });
+
+  it("allows a first bank that reaches 1000 and advances", async () => {
+    const code = await makeGame("ten");
+    queueDice(1, 1, 1, 2, 3, 4); // triple 1s = 1000
+    await rollTen({ code, byUid: "u1" });
+    await bankTen({ code, byUid: "u1", keep: [0, 1, 2] });
+    const g = await get(code);
+    expect(g.slots[0]!.score).toBe(1000);
+    expect(g.slots[0]!.onBoard).toBe(true);
+    expect(g.current).toBe(1);
+    expect(g.ten).toEqual({
+      turnScore: 0,
+      kept: [],
+      rolledThisStep: [],
+      mustChoose: false,
+    });
+  });
+
+  it("reaching 10000 finishes the game", async () => {
+    const code = await makeGame("ten");
+    // Put u1 on board near the target.
+    await updateGameTx(code, (doc, commit) => {
+      const slots = [...doc.slots];
+      slots[0] = { ...slots[0]!, score: 9500, onBoard: true };
+      commit({ slots });
+    });
+    queueDice(1, 1, 1, 2, 3, 4); // 1000 -> 10500 capped to 10000
+    await rollTen({ code, byUid: "u1" });
+    await bankTen({ code, byUid: "u1", keep: [0, 1, 2] });
+    const g = await get(code);
+    expect(g.status).toBe("finished");
+    expect(g.winner).toBe("u1");
+    expect(g.slots[0]!.score).toBe(10000);
+    expect(g.current).toBe(0); // did not advance
+  });
+});
+
+/* ================================================================ */
+/* 10,000 — rollAgainTen                                            */
+/* ================================================================ */
+
+describe("rollAgainTen", () => {
+  it("keeps scoring dice, rerolls the rest, accrues turnScore", async () => {
+    const code = await makeGame("ten");
+    queueDice(1, 5, 2, 3, 4, 6); // 1 -> 100, 5 -> 50
+    await rollTen({ code, byUid: "u1" });
+    // keep the single 1 (100), reroll remaining 5 dice
+    queueDice(5, 2, 3, 4, 6); // reroll has a 5 -> not a farkle
+    await rollAgainTen({ code, byUid: "u1", keep: [0] });
+    const g = await get(code);
+    expect(g.ten?.turnScore).toBe(100);
+    expect(g.ten?.kept).toEqual([1]);
+    expect(g.ten?.mustChoose).toBe(true);
+    expect(g.ten?.rolledThisStep).toEqual([5, 2, 3, 4, 6]);
+    expect(g.current).toBe(0); // same turn
+  });
+
+  it("hot dice: keeping all six rerolls a fresh six", async () => {
+    const code = await makeGame("ten");
+    queueDice(1, 1, 1, 5, 5, 5); // triple 1s (1000) + triple 5s (500)
+    await rollTen({ code, byUid: "u1" });
+    queueDice(1, 5, 2, 2, 3, 4); // hot-dice reroll of all 6, scores
+    await rollAgainTen({ code, byUid: "u1", keep: [0, 1, 2, 3, 4, 5] });
+    const g = await get(code);
+    expect(g.ten?.turnScore).toBe(1500);
+    expect(g.ten?.kept).toEqual([]); // reset for hot dice
+    expect(g.ten?.rolledThisStep).toEqual([1, 5, 2, 2, 3, 4]);
+    expect(g.ten?.mustChoose).toBe(true);
+  });
+
+  it("reroll farkles: forfeits turnScore and advances", async () => {
+    const code = await makeGame("ten");
+    queueDice(1, 2, 3, 4, 6, 6); // single 1 scores
+    await rollTen({ code, byUid: "u1" });
+    queueDice(2, 3, 4, 6, 6); // reroll of 5 dice, no score -> farkle
+    await rollAgainTen({ code, byUid: "u1", keep: [0] });
+    const g = await get(code);
+    expect(g.lastResult?.outcome).toBe("farkle");
+    expect(g.ten).toEqual({
+      turnScore: 0,
+      kept: [],
+      rolledThisStep: [],
+      mustChoose: false,
+    });
+    expect(g.current).toBe(1);
+  });
+
+  it("accumulates turnScore across a roll-again then a bank", async () => {
+    const code = await makeGame("ten");
+    queueDice(1, 1, 1, 2, 3, 4); // triple 1s = 1000
+    await rollTen({ code, byUid: "u1" });
+    queueDice(5, 2, 3); // reroll the 3 non-1 dice
+    await rollAgainTen({ code, byUid: "u1", keep: [0, 1, 2] });
+    const mid = await get(code);
+    expect(mid.ten?.turnScore).toBe(1000);
+    expect(mid.ten?.kept).toEqual([1, 1, 1]);
+    // bank the 5 (50) -> total 1050, on board
+    await bankTen({ code, byUid: "u1", keep: [0] });
+    const g = await get(code);
+    expect(g.slots[0]!.score).toBe(1050);
+    expect(g.slots[0]!.onBoard).toBe(true);
   });
 });
