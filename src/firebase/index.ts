@@ -29,6 +29,16 @@ export type {
   RefundWagersInput,
 } from "./ops";
 
+export {
+  rollCraps,
+  rollClo,
+  rollTen,
+  bankTen,
+  rollAgainTen,
+  genId,
+} from "./gameplay";
+export type { RollInput, TenKeepInput } from "./gameplay";
+
 export { TEST_MODE } from "./mode";
 export { firebaseConfig, isFirebaseConfigured } from "./config";
 export type { FirebaseConfig } from "./config";
