@@ -1,7 +1,7 @@
 import "../styles/gameover.css";
 import { setState, state, subscribe, type GameState, type Slot } from "../state";
 import { createRoom } from "../firebase";
-import { watchRoom, leaveRoom } from "../game-bridge";
+import { watchRoom, leaveRoom, stopWatching } from "../game-bridge";
 import { rememberRoom, rememberChallengers } from "../recent";
 
 const GAMEOVER_HTML = `
@@ -121,6 +121,9 @@ export function mount(root: HTMLElement): () => void {
         void playAgain();
         break;
       case "new-game":
+        // Drop the finished room's subscription before navigating, else a
+        // late doc update could route us back to gameover.
+        stopWatching();
         setState({ screen: "mode-select" });
         break;
       case "home":
