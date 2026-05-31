@@ -54,6 +54,21 @@ describe("createRoom", () => {
     expect(stored.turnDurationMs).toBe(30000);
   });
 
+  it("seeds every slot with the starting chip stack and no locked wager", async () => {
+    const code = await createRoom({
+      mode: "craps",
+      numPlayers: 3,
+      hostUid: "u1",
+      hostName: "Alice",
+    });
+    const stored = (await readGame(code)) as GameDoc;
+    expect(stored.wager).toBeNull();
+    expect(stored.slots).toHaveLength(3);
+    for (const slot of stored.slots) {
+      expect(slot.chips).toBe(100);
+    }
+  });
+
   it("seeds mode-specific substate", async () => {
     const cloCode = await createRoom({
       mode: "clo",
