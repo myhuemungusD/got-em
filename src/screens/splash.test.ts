@@ -141,9 +141,11 @@ describe("splash Join with Code (inline)", () => {
 
   it("joins an existing waiting room and lands in lobby", async () => {
     setState({ myName: "Jay", myUid: "uid-jay" });
+    // 3 seats so the join leaves a slot open and the room stays "waiting"
+    // (filling the last seat would auto-start the game → "play").
     const code = await createRoom({
       mode: "craps",
-      numPlayers: 2,
+      numPlayers: 3,
       hostUid: "host-1",
       hostName: "Host",
     });
