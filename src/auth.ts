@@ -77,21 +77,7 @@ export function loadSavedName(): string {
   }
 }
 
-/**
- * Pull a 4-letter room code from the current URL (query param OR hash).
- * Ported from `getCodeFromUrl` in the prototype (~line 2442). Returns an
- * uppercase code or null.
- */
-export function getCodeFromUrl(href: string = location.href): string | null {
-  let url: URL;
-  try {
-    url = new URL(href);
-  } catch {
-    return null;
-  }
-  const fromQuery = url.search.match(/[?&]room=([A-Za-z]{4})\b/);
-  if (fromQuery?.[1]) return fromQuery[1].toUpperCase();
-  const fromHash = url.hash.match(/room=([A-Za-z]{4})\b/);
-  if (fromHash?.[1]) return fromHash[1].toUpperCase();
-  return null;
-}
+// Deep-link parsing lives in invite.ts (the single source of truth, with
+// charset validation matching real room codes). Re-exported here so boot and
+// auth callers have one import surface.
+export { getCodeFromUrl } from "./invite";
