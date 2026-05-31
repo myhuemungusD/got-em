@@ -262,6 +262,51 @@ export async function advanceTurn(input: AdvanceTurnInput): Promise<void> {
   });
 }
 
+export interface LockWagersInput {
+  code: string;
+  hostUid: string;
+  amount: number;
+}
+
+/**
+ * Host locks a per-player buy-in for the room while still in the lobby.
+ * Deducts `amount` from every occupied slot's chip stack and builds the
+ * room-local pot embedded on the game doc. Idempotency is enforced by the
+ * `wager === null` guard — a second lock attempt throws `WAGER_LOCKED`.
+ *
+ * Asserts (in order): room exists, caller is host, status is "waiting",
+ * no wager already locked, and every seated player can afford `amount`.
+ */
+export async function lockWagers(input: LockWagersInput): Promise<void> {
+  await updateGameTx(input.code, (g, commit) => {
+    if (g.hostUid !== input.hostUid) throw new Error("NOT_HOST");
+    if (g.status !== "waiting") throw new Error("ALREADY_STARTED");
+    if (g.wager !== null) throw new Error("WAGER_LOCKED");
+    if (input.amount < 0) throw new Error("INSUFFICIENT_CHIPS");
+
+    const occupied = g.slots.filter((s) => s.uid !== null);
+    if (occupied.some((s) => s.chips < input.amount)) {
+      throw new Error("INSUFFICIENT_CHIPS");
+    }
+
+    const newSlots = g.slots.map((s) =>
+      s.uid !== null ? { ...s, chips: s.chips - input.amount } : s,
+    );
+    const contributions: Record<string, number> = {};
+    for (const s of occupied) {
+      contributions[s.uid as string] = input.amount;
+    }
+    const wager = {
+      amount: input.amount,
+      contributions,
+      total: input.amount * occupied.length,
+      settled: false,
+      paidTo: null,
+    };
+    commit({ slots: newSlots, wager });
+  });
+}
+
 export interface LeaveGameInput {
   code: string;
   uid: string;

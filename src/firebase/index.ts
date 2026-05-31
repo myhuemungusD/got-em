@@ -14,6 +14,7 @@ export {
   subscribeGame,
   updateGameTx,
   genCode,
+  lockWagers,
 } from "./ops";
 export type {
   CreateRoomInput,
@@ -21,6 +22,7 @@ export type {
   StartGameInput,
   AdvanceTurnInput,
   LeaveGameInput,
+  LockWagersInput,
 } from "./ops";
 
 export { TEST_MODE } from "./mode";
@@ -44,4 +46,5 @@ export type {
   TenState,
   RollResult,
   GameState,
+  WagerPot,
 } from "./types";
