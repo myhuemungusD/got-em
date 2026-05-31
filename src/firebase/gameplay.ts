@@ -4,6 +4,7 @@
  * prototype `prototypes/gotem.html`:
  *   - rollCraps        ~1645–1672
  *   - rollClo / s456   ~1674–1708 (one engine; `mode` only selects scoring)
+ *   - rollTen          ~1710–1735
  *
  * Every mutation flows through `updateGameTx` (the sanctioned transactional
  * reducer in ops.ts) — never a raw setDoc/updateDoc. Dice are rolled INSIDE
@@ -20,6 +21,7 @@ import type { GameDoc, RollResult, Slot } from "./types";
 import { rollN } from "../scoring/dice";
 import { crapsResolve } from "../scoring/craps";
 import { cloResolve } from "../scoring/clo";
+import { ten10kScoreCombo } from "../scoring/farkle";
 
 /* -------------------------------------------------------------------- */
 /* Per-mode win targets (ported from prototype MODES, lines ~1059–1063) */
@@ -254,6 +256,47 @@ export async function rollClo(input: RollInput): Promise<void> {
       slots,
       status: "finished",
       winner: top.uid,
+    });
+  });
+}
+
+/* -------------------------------------------------------------------- */
+/* 10,000 (farkle) — initial roll                                       */
+/* -------------------------------------------------------------------- */
+
+/**
+ * Initial roll of a 10,000 turn: roll the (6 - kept) open dice. With no kept
+ * dice that's all 6. No scoring dice → Farkle: forfeit `turnScore`, reset ten
+ * state, advance. Otherwise stash the rolled dice and flag `mustChoose`, then
+ * wait for bankTen / rollAgainTen. Port of `ten10kRoll` (~1710–1735).
+ */
+export async function rollTen(input: RollInput): Promise<void> {
+  await updateGameTx(input.code, (g, commit) => {
+    assertTurn(g, input.byUid);
+    const t = g.ten ?? {
+      turnScore: 0,
+      kept: [],
+      rolledThisStep: [],
+      mustChoose: false,
+    };
+    const numToRoll = 6 - t.kept.length;
+    const roll = rollN(numToRoll);
+    const { score: maxScore } = ten10kScoreCombo(roll);
+
+    if (maxScore === 0) {
+      commit({
+        ...rollMeta(roll, { outcome: "farkle", label: "FARKLE" }, input.byUid),
+        ten: { turnScore: 0, kept: [], rolledThisStep: [], mustChoose: false },
+        current: nextCurrent(g),
+        ...turnStamps(g),
+      });
+      return;
+    }
+
+    commit({
+      ...rollMeta(roll, { outcome: "rolled", label: "" }, input.byUid),
+      ten: { ...t, rolledThisStep: roll, mustChoose: true },
+      ...turnStamps(g),
     });
   });
 }

@@ -6,7 +6,7 @@ import {
   readGame,
   updateGameTx,
 } from "./index";
-import { rollCraps, rollClo } from "./gameplay";
+import { rollCraps, rollClo, rollTen } from "./gameplay";
 import { __resetMock } from "./mock";
 import { setDieSource, resetDieSource } from "../scoring/dice";
 import type { GameDoc, GameMode } from "./types";
@@ -233,5 +233,36 @@ describe("rollClo", () => {
     await rollClo({ code, byUid: "u2" });
     const g = await get(code);
     expect(g.winner).toBe("u1");
+  });
+});
+
+/* ================================================================ */
+/* 10,000 — initial roll                                            */
+/* ================================================================ */
+
+describe("rollTen", () => {
+  it("no scoring dice farkles: forfeits turnScore and advances", async () => {
+    const code = await makeGame("ten");
+    queueDice(2, 2, 3, 4, 4, 6); // no 1s/5s, no triple, not three pairs -> 0
+    await rollTen({ code, byUid: "u1" });
+    const g = await get(code);
+    expect(g.lastResult?.outcome).toBe("farkle");
+    expect(g.ten).toEqual({
+      turnScore: 0,
+      kept: [],
+      rolledThisStep: [],
+      mustChoose: false,
+    });
+    expect(g.current).toBe(1);
+  });
+
+  it("scoring dice present sets mustChoose and stashes the roll", async () => {
+    const code = await makeGame("ten");
+    queueDice(1, 5, 2, 3, 4, 6); // has 1 and 5
+    await rollTen({ code, byUid: "u1" });
+    const g = await get(code);
+    expect(g.ten?.mustChoose).toBe(true);
+    expect(g.ten?.rolledThisStep).toEqual([1, 5, 2, 3, 4, 6]);
+    expect(g.current).toBe(0); // same turn
   });
 });

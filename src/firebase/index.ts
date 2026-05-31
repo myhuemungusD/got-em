@@ -29,7 +29,7 @@ export type {
   RefundWagersInput,
 } from "./ops";
 
-export { rollCraps, rollClo, genId } from "./gameplay";
+export { rollCraps, rollClo, rollTen, genId } from "./gameplay";
 export type { RollInput } from "./gameplay";
 
 export { TEST_MODE } from "./mode";
