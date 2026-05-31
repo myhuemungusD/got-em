@@ -162,7 +162,8 @@ export interface JoinRoomInput {
 /**
  * Take an open slot in an existing room. Idempotent if you already hold a
  * slot. Throws stable string errors (`ROOM_NOT_FOUND`, `GAME_OVER`,
- * `ALREADY_STARTED`, `BAD_SLOT`, `SLOT_TAKEN`) — mirrors `joinGameAtSlot`.
+ * `ALREADY_STARTED`, `WAGER_LOCKED`, `BAD_SLOT`, `SLOT_TAKEN`) — mirrors
+ * `joinGameAtSlot`.
  */
 export async function joinRoom(input: JoinRoomInput): Promise<void> {
   const code = input.code.toUpperCase();
@@ -174,6 +175,9 @@ export async function joinRoom(input: JoinRoomInput): Promise<void> {
     if (g.status === "finished") throw new Error("GAME_OVER");
     if (g.playerUids.includes(input.uid)) return;
     if (g.status === "in_progress") throw new Error("ALREADY_STARTED");
+    // Once the host locks a buy-in, the roster is frozen — otherwise a late
+    // joiner could play (and win the pot) without being charged or recorded.
+    if (g.wager !== null) throw new Error("WAGER_LOCKED");
     const slot = g.slots[input.slotIdx];
     if (!slot) throw new Error("BAD_SLOT");
     if (slot.uid) throw new Error("SLOT_TAKEN");
@@ -276,14 +280,22 @@ export interface LockWagersInput {
  * `wager === null` guard — a second lock attempt throws `WAGER_LOCKED`.
  *
  * Asserts (in order): room exists, caller is host, status is "waiting",
- * no wager already locked, and every seated player can afford `amount`.
+ * no wager already locked, `amount` is a non-negative integer, and every
+ * seated player can afford `amount`.
+ *
+ * Locking freezes the roster: `joinRoom` rejects new players once a wager
+ * is locked, so `contributions` always matches the players who will play.
  */
 export async function lockWagers(input: LockWagersInput): Promise<void> {
   await updateGameTx(input.code, (g, commit) => {
     if (g.hostUid !== input.hostUid) throw new Error("NOT_HOST");
     if (g.status !== "waiting") throw new Error("ALREADY_STARTED");
     if (g.wager !== null) throw new Error("WAGER_LOCKED");
-    if (input.amount < 0) throw new Error("INSUFFICIENT_CHIPS");
+    // Reject NaN/Infinity/non-integer/negative before mutating any chips —
+    // NaN comparisons are always false and would silently store NaN stacks.
+    if (!Number.isInteger(input.amount) || input.amount < 0) {
+      throw new Error("INVALID_WAGER");
+    }
 
     const occupied = g.slots.filter((s) => s.uid !== null);
     if (occupied.some((s) => s.chips < input.amount)) {

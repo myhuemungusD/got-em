@@ -67,6 +67,7 @@ export type OpError =
   | "NOT_IN_PROGRESS"
   | "NOT_YOUR_TURN"
   | "CODE_GEN_FAILED"
+  | "INVALID_WAGER"
   | "INSUFFICIENT_CHIPS"
   | "WAGER_LOCKED"
   | "WAGER_NOT_LOCKED"

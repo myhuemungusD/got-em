@@ -78,7 +78,25 @@ describe("lockWagers", () => {
     const code = await lobbyOfTwo();
     await expect(
       lockWagers({ code, hostUid: "u1", amount: -5 }),
-    ).rejects.toThrow("INSUFFICIENT_CHIPS");
+    ).rejects.toThrow("INVALID_WAGER");
+  });
+
+  it("rejects a NaN buy-in without mutating any chips", async () => {
+    const code = await lobbyOfTwo();
+    await expect(
+      lockWagers({ code, hostUid: "u1", amount: Number.NaN }),
+    ).rejects.toThrow("INVALID_WAGER");
+    const doc = (await readGame(code)) as GameDoc;
+    expect(doc.wager).toBeNull();
+    expect(doc.slots[0]!.chips).toBe(100);
+    expect(doc.slots[1]!.chips).toBe(100);
+  });
+
+  it("rejects a fractional buy-in", async () => {
+    const code = await lobbyOfTwo();
+    await expect(
+      lockWagers({ code, hostUid: "u1", amount: 12.5 }),
+    ).rejects.toThrow("INVALID_WAGER");
   });
 
   it("rejects a non-host caller", async () => {
@@ -102,6 +120,19 @@ describe("lockWagers", () => {
     await expect(
       lockWagers({ code, hostUid: "u1", amount: 10 }),
     ).rejects.toThrow("ALREADY_STARTED");
+  });
+
+  it("freezes the roster: no new joiners once a wager is locked", async () => {
+    // lobbyOfTwo leaves slot 2 (idx 2) open in a 3-slot room.
+    const code = await lobbyOfTwo();
+    await lockWagers({ code, hostUid: "u1", amount: 25 });
+    await expect(
+      joinRoom({ code, slotIdx: 2, uid: "u3", name: "Cara" }),
+    ).rejects.toThrow("WAGER_LOCKED");
+    // Pot accounting is untouched by the rejected join.
+    const doc = (await readGame(code)) as GameDoc;
+    expect(doc.wager?.total).toBe(50);
+    expect(doc.playerUids).toEqual(["u1", "u2"]);
   });
 
   it("throws ROOM_NOT_FOUND for an unknown code", async () => {
