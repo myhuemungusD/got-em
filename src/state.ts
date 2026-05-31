@@ -82,6 +82,11 @@ export interface GameState {
   ten?: TenState;
 }
 
+export interface LastConfig {
+  mode: GameMode;
+  numPlayers: number;
+}
+
 export interface AppState {
   screen: Screen;
   myUid: string | null;
@@ -93,6 +98,14 @@ export interface AppState {
   proposedWager: number; // host's lobby input; default 0
   selectedStartingChips: number; // default 100
   lastError: string | null;
+  /** Last roll id we've already mirrored, so remote rolls animate exactly once. */
+  lastSeenRollId: string | null;
+  /** True while a remote roll animation is playing; the screen cut waits on it. */
+  isAnimatingRoll: boolean;
+  /** 10,000-mode local die selection; reset when the turn or roll changes. */
+  pendingTenSelection: number[];
+  /** Mode + player count of the last finished game, for the rematch shortcut. */
+  lastConfig: LastConfig | null;
 }
 
 const initialState: AppState = {
@@ -106,6 +119,10 @@ const initialState: AppState = {
   proposedWager: 0,
   selectedStartingChips: 100,
   lastError: null,
+  lastSeenRollId: null,
+  isAnimatingRoll: false,
+  pendingTenSelection: [],
+  lastConfig: null,
 };
 
 export const state: AppState = { ...initialState };
