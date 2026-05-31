@@ -6,7 +6,7 @@ import {
   readGame,
   updateGameTx,
 } from "./index";
-import { rollCraps } from "./gameplay";
+import { rollCraps, rollClo } from "./gameplay";
 import { __resetMock } from "./mock";
 import { setDieSource, resetDieSource } from "../scoring/dice";
 import type { GameDoc, GameMode } from "./types";
@@ -164,5 +164,74 @@ describe("rollCraps", () => {
     expect(g.status).toBe("finished");
     expect(g.winner).toBe("u1");
     expect(g.current).toBe(0); // did NOT advance
+  });
+});
+
+/* ================================================================ */
+/* C-Lo / 4-5-6                                                     */
+/* ================================================================ */
+
+describe("rollClo", () => {
+  it("reroll outcome rolls again on the same turn", async () => {
+    const code = await makeGame("clo");
+    queueDice(1, 3, 5); // no pair/triple/straight -> reroll
+    await rollClo({ code, byUid: "u1" });
+    const g = await get(code);
+    expect(g.current).toBe(0); // same turn
+    expect(g.matchup?.rolls.u1).toBeUndefined();
+  });
+
+  it("records a determinate roll and advances to the next player", async () => {
+    const code = await makeGame("clo");
+    queueDice(2, 2, 5); // point 5
+    await rollClo({ code, byUid: "u1" });
+    const g = await get(code);
+    expect(g.matchup?.rolls.u1).toEqual([2, 2, 5]);
+    expect(g.current).toBe(1);
+  });
+
+  it("when all players have rolled the highest rank wins and finishes", async () => {
+    const code = await makeGame("clo");
+    queueDice(2, 2, 3); // u1 point 3
+    await rollClo({ code, byUid: "u1" });
+    queueDice(2, 2, 6); // u2 point 6 -> higher
+    await rollClo({ code, byUid: "u2" });
+    const g = await get(code);
+    expect(g.status).toBe("finished");
+    expect(g.winner).toBe("u2");
+    expect(g.slots[1]!.score).toBe(1);
+  });
+
+  it("4-5-6 (rank 1000) beats a point", async () => {
+    const code = await makeGame("clo");
+    queueDice(2, 2, 6); // u1 point 6
+    await rollClo({ code, byUid: "u1" });
+    queueDice(4, 5, 6); // u2 instant 4-5-6
+    await rollClo({ code, byUid: "u2" });
+    const g = await get(code);
+    expect(g.winner).toBe("u2");
+  });
+
+  it("tie on top rank clears tied rolls and resets to first tied seat", async () => {
+    const code = await makeGame("clo");
+    queueDice(3, 3, 5); // u1 point 5
+    await rollClo({ code, byUid: "u1" });
+    queueDice(1, 1, 5); // u2 point 5 -> tie
+    await rollClo({ code, byUid: "u2" });
+    const g = await get(code);
+    expect(g.status).toBe("in_progress");
+    expect(g.matchup?.rolls.u1).toBeUndefined();
+    expect(g.matchup?.rolls.u2).toBeUndefined();
+    expect(g.current).toBe(0); // first tied seat
+  });
+
+  it("s456 uses the same engine", async () => {
+    const code = await makeGame("s456");
+    queueDice(4, 5, 6);
+    await rollClo({ code, byUid: "u1" });
+    queueDice(1, 1, 3); // point 3
+    await rollClo({ code, byUid: "u2" });
+    const g = await get(code);
+    expect(g.winner).toBe("u1");
   });
 });

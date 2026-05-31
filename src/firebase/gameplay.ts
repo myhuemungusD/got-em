@@ -3,6 +3,7 @@
  * a Got Em game forward. Ported verbatim (semantics-wise) from the validated
  * prototype `prototypes/gotem.html`:
  *   - rollCraps        ~1645–1672
+ *   - rollClo / s456   ~1674–1708 (one engine; `mode` only selects scoring)
  *
  * Every mutation flows through `updateGameTx` (the sanctioned transactional
  * reducer in ops.ts) — never a raw setDoc/updateDoc. Dice are rolled INSIDE
@@ -18,6 +19,7 @@ import { updateGameTx } from "./ops";
 import type { GameDoc, RollResult, Slot } from "./types";
 import { rollN } from "../scoring/dice";
 import { crapsResolve } from "../scoring/craps";
+import { cloResolve } from "../scoring/clo";
 
 /* -------------------------------------------------------------------- */
 /* Per-mode win targets (ported from prototype MODES, lines ~1059–1063) */
@@ -158,6 +160,100 @@ export async function rollCraps(input: RollInput): Promise<void> {
       craps: { phase: "comeout", point: null },
       current: nextCurrent(g),
       ...turnStamps(g),
+    });
+  });
+}
+
+/* -------------------------------------------------------------------- */
+/* C-Lo / 4-5-6                                                         */
+/* -------------------------------------------------------------------- */
+
+/**
+ * Roll three dice for c-lo / 4-5-6 (same engine; `mode` only labels the room).
+ * An indeterminate roll ("reroll") rolls again on the same turn. Otherwise the
+ * player's result is recorded into `matchup.rolls[uid]` and the turn advances.
+ * Once every seated player has a recorded roll, the highest rank wins. On a tie
+ * for the top rank, the tied players' rolls are cleared and `current` is reset
+ * to the first tied seat so they re-roll. Port of `cloRoll` (~1674–1708).
+ *
+ * Note on storage: the prototype stashes the whole result object under the uid.
+ * Our typed `MatchupState.rolls` is `Record<string, number[]>`, so we persist
+ * the dice array and recompute rank via `cloResolve` when ranking — equivalent,
+ * since the rank is a pure function of the dice.
+ */
+export async function rollClo(input: RollInput): Promise<void> {
+  await updateGameTx(input.code, (g, commit) => {
+    const slot = assertTurn(g, input.byUid);
+    const roll = rollN(3);
+    const result = cloResolve(roll);
+    const meta = rollMeta(roll, result, input.byUid);
+
+    if (result.outcome === "reroll") {
+      commit({ ...meta, ...turnStamps(g) });
+      return;
+    }
+
+    const rollerUid = slot.uid as string;
+    const matchupRolls: Record<string, number[]> = {
+      ...(g.matchup?.rolls ?? {}),
+    };
+    matchupRolls[rollerUid] = roll;
+
+    const seated = g.slots.filter((s): s is Slot & { uid: string } =>
+      Boolean(s.uid),
+    );
+    const allDone = seated.every((s) => matchupRolls[s.uid] !== undefined);
+
+    if (!allDone) {
+      commit({
+        ...meta,
+        matchup: { rolls: matchupRolls },
+        current: nextCurrent(g),
+        ...turnStamps(g),
+      });
+      return;
+    }
+
+    // Everyone has rolled — rank by recomputed combo rank (highest wins).
+    const ranked = seated
+      .map((s) => {
+        const dice = matchupRolls[s.uid]!;
+        const r = cloResolve(dice);
+        return { uid: s.uid, rank: r.rank ?? Number.NEGATIVE_INFINITY };
+      })
+      .sort((a, b) => b.rank - a.rank);
+
+    const top = ranked[0]!;
+    const tied = ranked.filter((x) => x.rank === top.rank);
+
+    if (tied.length > 1) {
+      // Tie: clear the tied players' rolls and reset current to the first
+      // tied seat so they re-roll.
+      const tiedUids = new Set(tied.map((t) => t.uid));
+      for (const uid of tiedUids) delete matchupRolls[uid];
+      const firstTiedSlotIdx = g.slots.findIndex(
+        (s) => s.uid !== null && tiedUids.has(s.uid),
+      );
+      commit({
+        ...meta,
+        matchup: { rolls: matchupRolls },
+        current: firstTiedSlotIdx,
+        ...turnStamps(g),
+      });
+      return;
+    }
+
+    // Sole winner: +1 score, finish.
+    const slots = [...g.slots];
+    const winnerIdx = slots.findIndex((s) => s.uid === top.uid);
+    const winSlot = slots[winnerIdx]!;
+    slots[winnerIdx] = { ...winSlot, score: winSlot.score + 1 };
+    commit({
+      ...meta,
+      matchup: { rolls: matchupRolls },
+      slots,
+      status: "finished",
+      winner: top.uid,
     });
   });
 }
