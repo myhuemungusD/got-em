@@ -9,6 +9,7 @@ export function mount(root: HTMLElement): () => void {
 
   const msg = document.createElement("p");
   msg.className = "setup-error__msg";
+  msg.setAttribute("role", "alert");
   msg.textContent = state.lastError ?? "Unknown error";
 
   const button = document.createElement("button");
@@ -24,6 +25,7 @@ export function mount(root: HTMLElement): () => void {
 
   wrapper.append(heading, msg, button);
   root.replaceChildren(wrapper);
+  button.focus();
 
   let lastRendered = state.lastError;
   const unsubscribe = subscribe((s) => {
