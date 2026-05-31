@@ -13,9 +13,11 @@ full phase plan.
 
 - **Phase 0** — closed. Scoring engine, central state, firebase mock + ops
   façade, screen router, and the splash screen are ported and typed.
-- **Phase 1** — in progress. Bulletproofing: strict TS (on), CI (live),
-  env config, error boundary. Lint is a tracked follow-up.
-- **Phase 2** — turn timer, dead-game cleanup, reconnection. The headline work.
+- **Phase 1** — closed. Bulletproofing: strict TS (on), CI (live),
+  env config, error boundary — all landed. Lint is a tracked follow-up.
+- **Phase 2** — in progress. Turn timer, dead-game cleanup, reconnection.
+  The headline work. First chunk (`advanceTurn` + turn-deadline fields) is
+  open as PR #17.
 - **Phase 3** — polish (PWA, icons, optional sound).
 
 ## Stack

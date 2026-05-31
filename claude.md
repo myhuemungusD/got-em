@@ -39,7 +39,7 @@ order, score limits, and join validity.
 
 ## Source of truth for porting
 
-`street-dice.html` is the validated prototype: 137 automated checks passing
+`prototypes/gotem.html` is the validated prototype: 137 automated checks passing
 (44 gameplay, 20 invite, 20 features, 53 scoring). Port FROM it, module by
 module, tests green at each step. Do not rewrite logic that already passes
 tests — move it and type it.
@@ -82,12 +82,10 @@ Intentionally left for later chunks. Do not treat these as bugs.
 - Real Firestore branch in `src/firebase/ops.ts` is `NOT_IMPLEMENTED` — real
   wiring lands together with `firestore.rules` in a later chunk. TEST_MODE
   path is fully functional today.
-- Placeholder TODO screens: `src/screens/boot.ts`, `setup-error.ts`,
-  `mode-select.ts`, `lobby.ts`, `play.ts`, `gameover.ts` each render a stub
+- Placeholder TODO screens: `src/screens/boot.ts`, `mode-select.ts`,
+  `lobby.ts`, `play.ts`, `gameover.ts` each render a stub
   string. Only `splash.ts` is real.
 - `src/components/` exists as an empty scaffold (`src/components/index.ts`).
   Dice, hand, and invite-modal components have not been built.
-- No CI workflow (Plan B / Phase 1 owns this).
-- No top-level error boundary on `main.ts` (Phase 1).
 - No runtime validation of `.env` values — only `.env.example` documents the
   expected keys. `isFirebaseConfigured()` is a yes/no check, not a validator.
