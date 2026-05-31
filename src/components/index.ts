@@ -1,2 +1,4 @@
-// Intentionally empty — scaffold for shared UI components (dice, hand, invite modal). Populated in a later phase.
-export {};
+export { buildFace, buildDie, renderDice, clearDice, haptic } from "./dice";
+export type { DieValue, DieOpts, RenderDiceOpts } from "./dice";
+export { createHand } from "./hand";
+export type { Hand, HandOpts } from "./hand";
