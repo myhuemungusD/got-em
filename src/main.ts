@@ -13,3 +13,11 @@ installErrorBoundary({
 startRouter({
   getScreenRoot: (name: Screen) => document.getElementById(`screen-${name}`),
 });
+
+if ("serviceWorker" in navigator && import.meta.env.PROD) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js").catch(() => {
+      // Best-effort registration; intentionally swallow errors.
+    });
+  });
+}
