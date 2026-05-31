@@ -22,8 +22,12 @@ const defaultSleep = (ms: number): Promise<void> =>
 
 export function createHand(container: HTMLElement, opts: HandOpts = {}): Hand {
   const sleep = opts.sleep ?? defaultSleep;
-  const arena =
-    opts.diceContainer ?? container.parentElement?.querySelector<HTMLElement>("#dice") ?? null;
+  // Resolve the dice arena lazily at roll time: `#dice` is a document-unique
+  // id that may live in a sibling subtree of the hand (e.g. `.arena` next to
+  // `.hand-area`), and may mount after this factory runs. A document-scoped
+  // lookup is robust to both; callers can still pass `diceContainer` to pin it.
+  const resolveArena = (): HTMLElement | null =>
+    opts.diceContainer ?? document.getElementById("dice");
 
   let cancelled = false;
 
@@ -46,6 +50,7 @@ export function createHand(container: HTMLElement, opts: HandOpts = {}): Hand {
     await sleep(OPEN_MS);
     if (cancelled) return;
 
+    const arena = resolveArena();
     if (arena) {
       arena.replaceChildren();
       values.forEach((v, idx) => {

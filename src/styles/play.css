@@ -163,10 +163,12 @@
 @keyframes scoringPulse {
   0%,
   100% {
-    transform: translateY(0) scale(1);
+    /* Keep the rolled-face rotation (set inline by buildDie) — otherwise the
+       cube snaps to its default orientation for the duration of the pulse. */
+    transform: translateY(0) scale(1) var(--final-rot);
   }
   50% {
-    transform: translateY(-3px) scale(1.04);
+    transform: translateY(-3px) scale(1.04) var(--final-rot);
   }
 }
 
