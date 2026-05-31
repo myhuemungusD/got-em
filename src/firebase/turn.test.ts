@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import {
+  advanceTurn,
   createRoom,
   joinRoom,
   leaveGame,
@@ -7,7 +8,6 @@ import {
   startGame,
   updateGameTx,
 } from "./index";
-import { advanceTurn } from "./ops";
 import { __resetMock } from "./mock";
 import type { GameDoc } from "./types";
 
