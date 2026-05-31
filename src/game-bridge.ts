@@ -100,17 +100,23 @@ export function watchRoom(code: string, hooks: WatchRoomHooks = {}): () => void 
   };
 }
 
-export function leaveRoom(): Promise<void> {
+/**
+ * Tear down the active room subscription and clear room state WITHOUT
+ * navigating. Use when leaving a room for a destination other than splash
+ * (e.g. "New Game" → mode-select) so a late update to the old (finished)
+ * doc can't route the user back via the still-live subscription.
+ */
+export function stopWatching(): void {
   if (activeUnsub) {
     activeUnsub();
     activeUnsub = null;
   }
-  setState({
-    game: null,
-    currentRoom: null,
-    lastSeenRollId: null,
-    screen: "splash",
-  });
+  setState({ game: null, currentRoom: null, lastSeenRollId: null });
+}
+
+export function leaveRoom(): Promise<void> {
+  stopWatching();
+  setState({ screen: "splash" });
   return Promise.resolve();
 }
 
