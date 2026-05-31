@@ -1,0 +1,100 @@
+/* Invite modal — ported from prototypes/gotem.html (lines 647–690). */
+.invite-modal {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.invite-qr-wrap {
+  width: 236px;
+  height: 236px;
+  margin: 4px auto 0;
+  border-radius: var(--r-md);
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  box-shadow: 0 0 0 1px var(--border), var(--sh-card);
+}
+.invite-qr-wrap.ready {
+  box-shadow: 0 0 0 1px var(--orange), var(--sh-glow-sm);
+}
+.invite-qr-wrap svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 4px;
+}
+.invite-qr-loading {
+  font-family: var(--font-display);
+  font-size: 12px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #999;
+}
+.invite-qr-caption {
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-mute);
+  margin-top: 2px;
+  letter-spacing: 0.02em;
+}
+.invite-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 4px 0;
+}
+.invite-divider::before,
+.invite-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+.invite-divider span {
+  font-family: var(--font-display);
+  font-size: 10px;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.invite-code-box {
+  text-align: center;
+  padding: 12px;
+  border-radius: var(--r-md);
+  background: var(--grad-card),
+    linear-gradient(180deg, #1a0e05 0%, var(--bg-elev-2) 100%);
+  border: 1px solid var(--orange);
+}
+.invite-code-label {
+  font-family: var(--font-display);
+  font-size: 10px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--orange);
+  font-weight: 400;
+}
+.invite-code-value {
+  font-family: var(--font-display);
+  font-size: 52px;
+  font-weight: 400;
+  letter-spacing: 0.2em;
+  color: var(--text);
+  line-height: 1;
+  text-shadow: 0 0 22px rgba(255, 107, 0, 0.5);
+}
+.invite-link {
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-mute);
+  word-break: break-all;
+}
+.invite-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
