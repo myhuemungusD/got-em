@@ -50,7 +50,7 @@ describe("startRouter", () => {
     const router = startRouter({ getScreenRoot: getRoot });
     const boot = getRoot("boot")!;
     expect(boot.hidden).toBe(false);
-    expect(boot.textContent).toBe("boot screen — TODO");
+    expect(boot.querySelector(".boot-spinner")).not.toBeNull();
     router.stop();
   });
 
@@ -68,12 +68,12 @@ describe("startRouter", () => {
     const boot = getRoot("boot")!;
     const splash = getRoot("splash")!;
 
-    expect(boot.textContent).toBe("boot screen — TODO");
+    expect(boot.querySelector(".boot-spinner")).not.toBeNull();
 
     setState({ screen: "splash" });
 
     expect(boot.hidden).toBe(true);
-    expect(boot.textContent).toBe("");
+    expect(boot.innerHTML).toBe("");
     expect(splash.hidden).toBe(false);
     expect(splash.querySelector('input[name="player-name"]')).not.toBeNull();
 

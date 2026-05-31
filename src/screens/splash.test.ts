@@ -126,7 +126,7 @@ describe("splash Join with Code (inline)", () => {
   });
 
   it("shows ROOM_NOT_FOUND status for an unknown code", async () => {
-    setState({ myName: "Jay" });
+    setState({ myName: "Jay", myUid: "uid-jay" });
     const root = makeRoot();
     mount(root);
     root.querySelector<HTMLButtonElement>('[data-action="open-join"]')!.click();
@@ -140,7 +140,7 @@ describe("splash Join with Code (inline)", () => {
   });
 
   it("joins an existing waiting room and lands in lobby", async () => {
-    setState({ myName: "Jay" });
+    setState({ myName: "Jay", myUid: "uid-jay" });
     const code = await createRoom({
       mode: "craps",
       numPlayers: 2,
@@ -163,7 +163,27 @@ describe("splash Join with Code (inline)", () => {
     expect(state.myUid).not.toBeNull();
   });
 
-  it("mints a local UID lazily when joining without one", async () => {
+  it("does NOT mint a uid; relies on state.myUid set by boot", async () => {
+    setState({ myName: "Jay", myUid: "uid-from-boot" });
+    const code = await createRoom({
+      mode: "craps",
+      numPlayers: 2,
+      hostUid: "host-1",
+      hostName: "Host",
+    });
+    const root = makeRoot();
+    mount(root);
+    root.querySelector<HTMLButtonElement>('[data-action="open-join"]')!.click();
+    const codeInput = root.querySelector<HTMLInputElement>("#join-code")!;
+    codeInput.value = code;
+    fire(codeInput, "input");
+    root.querySelector<HTMLButtonElement>('[data-action="submit-join"]')!.click();
+    await flush();
+    await flush();
+    expect(state.myUid).toBe("uid-from-boot");
+  });
+
+  it("shows a status and stays put when myUid is missing", async () => {
     setState({ myName: "Jay" });
     expect(state.myUid).toBeNull();
     const code = await createRoom({
@@ -181,7 +201,9 @@ describe("splash Join with Code (inline)", () => {
     root.querySelector<HTMLButtonElement>('[data-action="submit-join"]')!.click();
     await flush();
     await flush();
-    expect(state.myUid).toMatch(/^[0-9a-f-]{36}$/i);
+    expect(state.myUid).toBeNull();
+    expect(state.currentRoom).toBeNull();
+    expect(root.querySelector("#splash-status")?.textContent).toContain("signing in");
   });
 });
 

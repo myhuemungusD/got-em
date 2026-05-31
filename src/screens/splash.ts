@@ -47,14 +47,6 @@ function humanError(err: unknown): string {
   return msg;
 }
 
-function ensureUid(): string {
-  if (state.myUid) return state.myUid;
-  // Lazy local UID; real anonymous auth replaces this when boot is wired.
-  const uid = crypto.randomUUID();
-  setState({ myUid: uid });
-  return uid;
-}
-
 export function mount(root: HTMLElement): () => void {
   root.classList.add("splash");
   root.innerHTML = SPLASH_HTML;
@@ -115,9 +107,13 @@ export function mount(root: HTMLElement): () => void {
       return;
     }
     setStatus("");
+    const uid = state.myUid;
+    if (!uid) {
+      setStatus("Still signing in — try again");
+      return;
+    }
     refs.submitJoinBtn.disabled = true;
     try {
-      const uid = ensureUid();
       const g = await readGame(code);
       if (!g) {
         setStatus("Room not found");
