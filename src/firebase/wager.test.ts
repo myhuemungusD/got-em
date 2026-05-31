@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import {
   createRoom,
   joinRoom,
+  leaveGame,
   startGame,
   readGame,
   updateGameTx,
@@ -232,5 +233,30 @@ describe("refundWagers", () => {
     await expect(refundWagers({ code: "ZZZZ" })).rejects.toThrow(
       "ROOM_NOT_FOUND",
     );
+  });
+});
+
+describe("roster freeze on leave", () => {
+  it("blocks a charged player from leaving a locked lobby", async () => {
+    const code = await lobbyOfTwo();
+    await lockWagers({ code, hostUid: "u1", amount: 25 });
+    await expect(leaveGame({ code, uid: "u2" })).rejects.toThrow(
+      "WAGER_LOCKED",
+    );
+    // The pot and roster are untouched by the rejected leave.
+    const doc = (await readGame(code)) as GameDoc;
+    expect(doc.wager?.total).toBe(50);
+    expect(doc.playerUids).toEqual(["u1", "u2"]);
+    expect(doc.slots[1]!.chips).toBe(75); // still charged, not reset to 100
+  });
+
+  it("releases the roster after a refund settles the pot", async () => {
+    const code = await lobbyOfTwo();
+    await lockWagers({ code, hostUid: "u1", amount: 25 });
+    await refundWagers({ code }); // settled = true, chips returned
+    // Now leaving is allowed again — the pot is inert.
+    await leaveGame({ code, uid: "u2" });
+    const doc = (await readGame(code)) as GameDoc;
+    expect(doc.playerUids).toEqual(["u1"]);
   });
 });

@@ -175,9 +175,10 @@ export async function joinRoom(input: JoinRoomInput): Promise<void> {
     if (g.status === "finished") throw new Error("GAME_OVER");
     if (g.playerUids.includes(input.uid)) return;
     if (g.status === "in_progress") throw new Error("ALREADY_STARTED");
-    // Once the host locks a buy-in, the roster is frozen — otherwise a late
+    // An active (locked, unsettled) pot freezes the roster — otherwise a late
     // joiner could play (and win the pot) without being charged or recorded.
-    if (g.wager !== null) throw new Error("WAGER_LOCKED");
+    // A settled pot (paid out or refunded) is inert and does not block.
+    if (g.wager !== null && !g.wager.settled) throw new Error("WAGER_LOCKED");
     const slot = g.slots[input.slotIdx];
     if (!slot) throw new Error("BAD_SLOT");
     if (slot.uid) throw new Error("SLOT_TAKEN");
@@ -388,6 +389,11 @@ export interface LeaveGameInput {
  * Walk away from a room. Only meaningful while `status === "waiting"`.
  * Promotes host if the leaver was host. Deletes the doc when empty.
  * Mirrors `leaveGame`.
+ *
+ * Rejects with `WAGER_LOCKED` while an active (locked, unsettled) pot
+ * exists: a charged player leaving would reset their slot while
+ * `wager.contributions`/`total` still count them, corrupting accounting.
+ * The host must `refundWagers` first to release the table.
  */
 export async function leaveGame(input: LeaveGameInput): Promise<void> {
   await runTx<void>(async (tx) => {
@@ -396,6 +402,7 @@ export async function leaveGame(input: LeaveGameInput): Promise<void> {
     if (!snap.exists()) return;
     const g = snap.data() as GameDoc;
     if (g.status !== "waiting") return;
+    if (g.wager !== null && !g.wager.settled) throw new Error("WAGER_LOCKED");
     const slotIdx = g.slots.findIndex((s) => s.uid === input.uid);
     if (slotIdx < 0) return;
     const newSlots = [...g.slots];
