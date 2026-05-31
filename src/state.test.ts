@@ -76,6 +76,9 @@ describe("state", () => {
         lastResult: null,
         lastRollId: null,
         lastRolledBy: null,
+        turnStartedAt: null,
+        turnDeadline: null,
+        turnDurationMs: 30000,
         craps: { phase: "comeout", point: null },
       },
     });
