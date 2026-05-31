@@ -11,7 +11,8 @@ export function crapsResolve(
   phase: CrapsPhase,
   point: number | null,
 ): CrapsResult {
-  const sum = roll[0] + roll[1];
+  const [a = 0, b = 0] = roll;
+  const sum = a + b;
   if (phase === "comeout") {
     if (sum === 7 || sum === 11) return { outcome: "win", sum, label: `${sum} · WIN` };
     if (sum === 2 || sum === 3 || sum === 12) return { outcome: "loss", sum, label: "CRAPS" };

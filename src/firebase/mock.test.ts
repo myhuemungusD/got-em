@@ -45,7 +45,7 @@ describe("createRoom", () => {
       score: 0,
       onBoard: false,
     });
-    expect(stored.slots[1].uid).toBeNull();
+    expect(stored.slots[1]!.uid).toBeNull();
     expect(stored.playerUids).toEqual(["u1"]);
     expect(stored.craps).toEqual({ phase: "comeout", point: null });
     expect(stored.turnStartedAt).toBeNull();
@@ -133,7 +133,7 @@ describe("joinRoom", () => {
     await joinRoom({ code, slotIdx: 2, uid: "u2", name: "B" });
     const doc = (await readGame(code)) as GameDoc;
     expect(doc.playerUids).toEqual(["u1", "u2"]);
-    expect(doc.slots[2].uid).toBeNull();
+    expect(doc.slots[2]!.uid).toBeNull();
   });
 
   it("throws ROOM_NOT_FOUND for an unknown code", async () => {
@@ -224,7 +224,7 @@ describe("leaveGame", () => {
     await joinRoom({ code, slotIdx: 1, uid: "u2", name: "B" });
     await leaveGame({ code, uid: "u2" });
     const doc = (await readGame(code)) as GameDoc;
-    expect(doc.slots[1].uid).toBeNull();
+    expect(doc.slots[1]!.uid).toBeNull();
     expect(doc.playerUids).toEqual(["u1"]);
   });
 

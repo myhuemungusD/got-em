@@ -26,6 +26,7 @@ function dispatchErrorEvent(opts: { message?: string; error?: Error | null }): v
 }
 
 function dispatchRejectionEvent(reason: unknown): void {
+  // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- test rig deliberately rejects with non-Error values.
   const promise = Promise.reject(reason);
   // swallow the rejection so jsdom/happy-dom doesn't complain
   promise.catch(() => {

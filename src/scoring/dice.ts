@@ -1,10 +1,12 @@
 export function rollDie(): number {
   if (typeof crypto !== "undefined" && crypto.getRandomValues) {
     const buf = new Uint32Array(1);
+    let value: number;
     do {
       crypto.getRandomValues(buf);
-    } while (buf[0] >= 0xfffffffa);
-    return (buf[0] % 6) + 1;
+      value = buf[0]!;
+    } while (value >= 0xfffffffa);
+    return (value % 6) + 1;
   }
   return Math.floor(Math.random() * 6) + 1;
 }

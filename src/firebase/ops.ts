@@ -281,7 +281,7 @@ export async function leaveGame(input: LeaveGameInput): Promise<void> {
     const newPlayerUids = g.playerUids.filter((u) => u !== input.uid);
     let newHost = g.hostUid;
     if (g.hostUid === input.uid && newPlayerUids.length > 0) {
-      newHost = newPlayerUids[0];
+      newHost = newPlayerUids[0]!;
     }
     if (newPlayerUids.length === 0) {
       tx.delete(ref);

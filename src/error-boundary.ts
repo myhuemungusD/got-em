@@ -16,12 +16,13 @@ function safeInvoke(onError: (message: string) => void, message: string): void {
 
 function messageFromRejection(reason: unknown): string {
   if (reason && typeof reason === "object" && "message" in reason) {
-    const m = (reason as { message: unknown }).message;
+    const m = reason.message;
     if (typeof m === "string" && m.length > 0) return m;
   }
   if (reason === undefined || reason === null) {
     return "Unhandled promise rejection";
   }
+  // eslint-disable-next-line @typescript-eslint/no-base-to-string -- intentional best-effort stringify; objects without `.message` already handled above.
   const str = String(reason);
   return str.length > 0 ? str : "Unhandled promise rejection";
 }
