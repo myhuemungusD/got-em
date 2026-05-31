@@ -15,6 +15,7 @@ export {
   updateGameTx,
   genCode,
   lockWagers,
+  settlePot,
 } from "./ops";
 export type {
   CreateRoomInput,
@@ -23,6 +24,7 @@ export type {
   AdvanceTurnInput,
   LeaveGameInput,
   LockWagersInput,
+  SettlePotInput,
 } from "./ops";
 
 export { TEST_MODE } from "./mode";

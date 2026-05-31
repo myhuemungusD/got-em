@@ -4,7 +4,9 @@ import {
   joinRoom,
   startGame,
   readGame,
+  updateGameTx,
   lockWagers,
+  settlePot,
 } from "./index";
 import { __resetMock } from "./mock";
 import type { GameDoc } from "./types";
@@ -23,6 +25,13 @@ async function lobbyOfTwo(): Promise<string> {
   });
   await joinRoom({ code, slotIdx: 1, uid: "u2", name: "Bob" });
   return code;
+}
+
+/** Force a room to a terminal state via the sanctioned tx path. */
+async function finish(code: string, winner: string | null): Promise<void> {
+  await updateGameTx(code, (_doc, commit) => {
+    commit({ status: "finished", winner });
+  });
 }
 
 describe("lockWagers", () => {
@@ -98,5 +107,56 @@ describe("lockWagers", () => {
     await expect(
       lockWagers({ code: "ZZZZ", hostUid: "u1", amount: 10 }),
     ).rejects.toThrow("ROOM_NOT_FOUND");
+  });
+});
+
+describe("settlePot", () => {
+  it("pays the full pot to the winner and flips settled/paidTo", async () => {
+    const code = await lobbyOfTwo();
+    await lockWagers({ code, hostUid: "u1", amount: 25 }); // both at 75, pot 50
+    await finish(code, "u2");
+    await settlePot({ code });
+    const doc = (await readGame(code)) as GameDoc;
+
+    expect(doc.slots[0].chips).toBe(75); // loser unchanged
+    expect(doc.slots[1].chips).toBe(125); // winner 75 + pot 50
+    expect(doc.wager?.settled).toBe(true);
+    expect(doc.wager?.paidTo).toBe("u2");
+  });
+
+  it("is idempotent — a second settle throws ALREADY_SETTLED", async () => {
+    const code = await lobbyOfTwo();
+    await lockWagers({ code, hostUid: "u1", amount: 25 });
+    await finish(code, "u2");
+    await settlePot({ code });
+    await expect(settlePot({ code })).rejects.toThrow("ALREADY_SETTLED");
+    const doc = (await readGame(code)) as GameDoc;
+    // Winner not paid twice.
+    expect(doc.slots[1].chips).toBe(125);
+  });
+
+  it("rejects when no wager is locked", async () => {
+    const code = await lobbyOfTwo();
+    await finish(code, "u2");
+    await expect(settlePot({ code })).rejects.toThrow("WAGER_NOT_LOCKED");
+  });
+
+  it("rejects when the game is not finished", async () => {
+    const code = await lobbyOfTwo();
+    await lockWagers({ code, hostUid: "u1", amount: 25 });
+    await expect(settlePot({ code })).rejects.toThrow("INVALID_SETTLEMENT");
+  });
+
+  it("rejects when there is no winner", async () => {
+    const code = await lobbyOfTwo();
+    await lockWagers({ code, hostUid: "u1", amount: 25 });
+    await finish(code, null);
+    await expect(settlePot({ code })).rejects.toThrow("INVALID_SETTLEMENT");
+  });
+
+  it("throws ROOM_NOT_FOUND for an unknown code", async () => {
+    await expect(settlePot({ code: "ZZZZ" })).rejects.toThrow(
+      "ROOM_NOT_FOUND",
+    );
   });
 });

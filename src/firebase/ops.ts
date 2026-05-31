@@ -24,6 +24,7 @@ import type {
   Slot,
   Unsubscribe,
   TxFn,
+  WagerPot,
 } from "./types";
 
 /* -------------------------------------------------------------------- */
@@ -303,6 +304,35 @@ export async function lockWagers(input: LockWagersInput): Promise<void> {
       settled: false,
       paidTo: null,
     };
+    commit({ slots: newSlots, wager });
+  });
+}
+
+export interface SettlePotInput {
+  code: string;
+}
+
+/**
+ * Pay the locked pot to the game's winner once the game is finished.
+ * Idempotent: a second call after settlement throws `ALREADY_SETTLED`,
+ * which is the double-payout guard.
+ *
+ * Asserts (in order): room exists, a wager is locked, not already settled,
+ * status is "finished", and a winner is recorded.
+ */
+export async function settlePot(input: SettlePotInput): Promise<void> {
+  await updateGameTx(input.code, (g, commit) => {
+    const pot = g.wager;
+    if (pot === null) throw new Error("WAGER_NOT_LOCKED");
+    if (pot.settled) throw new Error("ALREADY_SETTLED");
+    if (g.status !== "finished") throw new Error("INVALID_SETTLEMENT");
+    if (g.winner === null) throw new Error("INVALID_SETTLEMENT");
+
+    const winner = g.winner;
+    const newSlots = g.slots.map((s) =>
+      s.uid === winner ? { ...s, chips: s.chips + pot.total } : s,
+    );
+    const wager: WagerPot = { ...pot, settled: true, paidTo: winner };
     commit({ slots: newSlots, wager });
   });
 }
