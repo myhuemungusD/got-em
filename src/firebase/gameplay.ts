@@ -19,7 +19,7 @@
 import { TEST_MODE } from "./mode";
 import * as mock from "./mock";
 import { updateGameTx } from "./ops";
-import type { GameDoc, RollResult, Slot } from "./types";
+import type { GameDoc, GameMode, RollResult, Slot } from "./types";
 import { rollN } from "../scoring/dice";
 import { crapsResolve } from "../scoring/craps";
 import { cloResolve } from "../scoring/clo";
@@ -76,12 +76,35 @@ function nextCurrent(g: GameDoc): number {
 }
 
 /**
- * Common gate for every gameplay op: game must be live and it must be the
- * caller's turn. Returns the active slot (guaranteed non-null on success) so
- * callers don't re-index under `noUncheckedIndexedAccess`.
+ * Index of the next seated player who has NOT yet recorded a roll, scanning
+ * forward from `current` and wrapping. Used by c-lo so that during a tie
+ * re-roll (where only the tied players' rolls were cleared) the turn advances
+ * to the next player who still owes a roll — never to a seat that already has
+ * a valid result, which would let them overwrite it. In normal play this is
+ * simply the next seat, since players roll in order.
  */
-function assertTurn(g: GameDoc, byUid: string): Slot {
+function nextUnrolled(g: GameDoc, rolls: Record<string, number[]>): number {
+  for (let i = 1; i <= g.numSlots; i++) {
+    const idx = (g.current + i) % g.numSlots;
+    const s = g.slots[idx];
+    if (s?.uid && rolls[s.uid] === undefined) return idx;
+  }
+  return g.current;
+}
+
+/**
+ * Common gate for every gameplay op: game must be live, the room's mode must
+ * match the op being called (so `rollCraps` can't corrupt a `ten` room), and
+ * it must be the caller's turn. Returns the active slot (guaranteed non-null
+ * on success) so callers don't re-index under `noUncheckedIndexedAccess`.
+ */
+function assertTurn(
+  g: GameDoc,
+  byUid: string,
+  allowedModes: readonly GameMode[],
+): Slot {
   if (g.status !== "in_progress") throw new Error("NOT_IN_PROGRESS");
+  if (!allowedModes.includes(g.mode)) throw new Error("WRONG_MODE");
   const slot = g.slots[g.current];
   if (!slot || slot.uid !== byUid) throw new Error("NOT_YOUR_TURN");
   return slot;
@@ -130,7 +153,7 @@ export interface TenKeepInput {
  */
 export async function rollCraps(input: RollInput): Promise<void> {
   await updateGameTx(input.code, (g, commit) => {
-    assertTurn(g, input.byUid);
+    assertTurn(g, input.byUid, ["craps"]);
     const craps = g.craps ?? { phase: "comeout", point: null };
     const roll = rollN(2);
     const result = crapsResolve(roll, craps.phase, craps.point);
@@ -196,7 +219,7 @@ export async function rollCraps(input: RollInput): Promise<void> {
  */
 export async function rollClo(input: RollInput): Promise<void> {
   await updateGameTx(input.code, (g, commit) => {
-    const slot = assertTurn(g, input.byUid);
+    const slot = assertTurn(g, input.byUid, ["clo", "s456"]);
     const roll = rollN(3);
     const result = cloResolve(roll);
     const meta = rollMeta(roll, result, input.byUid);
@@ -221,7 +244,7 @@ export async function rollClo(input: RollInput): Promise<void> {
       commit({
         ...meta,
         matchup: { rolls: matchupRolls },
-        current: nextCurrent(g),
+        current: nextUnrolled(g, matchupRolls),
         ...turnStamps(g),
       });
       return;
@@ -283,13 +306,17 @@ export async function rollClo(input: RollInput): Promise<void> {
  */
 export async function rollTen(input: RollInput): Promise<void> {
   await updateGameTx(input.code, (g, commit) => {
-    assertTurn(g, input.byUid);
+    assertTurn(g, input.byUid, ["ten"]);
     const t = g.ten ?? {
       turnScore: 0,
       kept: [],
       rolledThisStep: [],
       mustChoose: false,
     };
+    // A pending choice must be resolved via bankTen / rollAgainTen — re-rolling
+    // the initial set here would let a player reroll until a favorable result,
+    // dodging Farkle risk.
+    if (t.mustChoose) throw new Error("CHOICE_PENDING");
     const numToRoll = 6 - t.kept.length;
     const roll = rollN(numToRoll);
     const { score: maxScore } = ten10kScoreCombo(roll);
@@ -358,7 +385,7 @@ const TEN_RESET = {
  */
 export async function bankTen(input: TenKeepInput): Promise<void> {
   await updateGameTx(input.code, (g, commit) => {
-    const slot = assertTurn(g, input.byUid);
+    const slot = assertTurn(g, input.byUid, ["ten"]);
     const t = g.ten;
     const score = validateKeep(t, input.keep);
     const turnScore = (t?.turnScore ?? 0) + score;
@@ -409,7 +436,7 @@ export async function bankTen(input: TenKeepInput): Promise<void> {
  */
 export async function rollAgainTen(input: TenKeepInput): Promise<void> {
   await updateGameTx(input.code, (g, commit) => {
-    assertTurn(g, input.byUid);
+    assertTurn(g, input.byUid, ["ten"]);
     const t = g.ten;
     const score = validateKeep(t, input.keep);
 

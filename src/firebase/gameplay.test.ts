@@ -418,3 +418,84 @@ describe("rollAgainTen", () => {
     expect(g.slots[0]!.onBoard).toBe(true);
   });
 });
+
+/* ---------------------------------------------------------------- */
+/* Review hardening: mode gate, choice-pending, tie advance.        */
+/* ---------------------------------------------------------------- */
+
+/** Build a 3-player in-progress game; u1/u2/u3 in seats 0/1/2. */
+async function makeGame3(mode: GameMode): Promise<string> {
+  const code = await createRoom({
+    mode,
+    numPlayers: 3,
+    hostUid: "u1",
+    hostName: "Alice",
+  });
+  await joinRoom({ code, slotIdx: 1, uid: "u2", name: "Bob" });
+  await joinRoom({ code, slotIdx: 2, uid: "u3", name: "Cara" });
+  await startGame({ code, hostUid: "u1" });
+  return code;
+}
+
+describe("mode gate", () => {
+  it("rejects calling the wrong roll op for the room mode", async () => {
+    const code = await makeGame("ten");
+    await expect(rollCraps({ code, byUid: "u1" })).rejects.toThrow("WRONG_MODE");
+    await expect(rollClo({ code, byUid: "u1" })).rejects.toThrow("WRONG_MODE");
+    // The room is untouched by the rejected calls.
+    const g = await get(code);
+    expect(g.craps).toBeUndefined();
+    expect(g.slots[0]!.score).toBe(0);
+  });
+
+  it("rejects rollTen / bankTen in a craps room", async () => {
+    const code = await makeGame("craps");
+    await expect(rollTen({ code, byUid: "u1" })).rejects.toThrow("WRONG_MODE");
+    await expect(
+      bankTen({ code, byUid: "u1", keep: [] }),
+    ).rejects.toThrow("WRONG_MODE");
+  });
+});
+
+describe("rollTen while a choice is pending", () => {
+  it("rejects a second initial roll until bank/rollAgain resolves it", async () => {
+    const code = await makeGame("ten");
+    queueDice(1, 2, 3, 4, 6, 2); // a lone 1 scores -> mustChoose
+    await rollTen({ code, byUid: "u1" });
+    const mid = await get(code);
+    expect(mid.ten?.mustChoose).toBe(true);
+    // Re-rolling the initial set would dodge Farkle risk — must be blocked.
+    await expect(rollTen({ code, byUid: "u1" })).rejects.toThrow(
+      "CHOICE_PENDING",
+    );
+    // State unchanged by the rejected reroll.
+    const after = await get(code);
+    expect(after.ten?.rolledThisStep).toEqual(mid.ten?.rolledThisStep);
+  });
+});
+
+describe("c-lo tie re-roll advance", () => {
+  it("advances to the next un-rolled tied seat, skipping a valid roll", async () => {
+    const code = await makeGame3("clo");
+    // seat0 u1: point 5 (rank 5); seat1 u2: point 3 (rank 3);
+    // seat2 u3: point 5 (rank 5) -> ties u1 at the top.
+    queueDice(2, 2, 5, /* u1 */ 1, 1, 3, /* u2 */ 3, 3, 5 /* u3 */);
+    await rollClo({ code, byUid: "u1" });
+    await rollClo({ code, byUid: "u2" });
+    await rollClo({ code, byUid: "u3" });
+    const tied = await get(code);
+    // Tie cleared u1 & u3; current reset to first tied seat (u1, seat 0).
+    expect(tied.current).toBe(0);
+    expect(tied.status).toBe("in_progress");
+    expect(tied.matchup?.rolls["u2"]).toBeDefined(); // u2's valid roll preserved
+    expect(tied.matchup?.rolls["u1"]).toBeUndefined();
+    expect(tied.matchup?.rolls["u3"]).toBeUndefined();
+
+    // u1 re-rolls a winner; turn must skip u2 (already valid) and land on u3.
+    queueDice(4, 5, 6);
+    await rollClo({ code, byUid: "u1" });
+    const after = await get(code);
+    expect(after.current).toBe(2); // u3, NOT u2 (seat 1)
+    expect(after.status).toBe("in_progress");
+  });
+});
