@@ -175,12 +175,18 @@ export async function joinRoom(input: JoinRoomInput): Promise<void> {
     newSlots[input.slotIdx] = { ...slot, uid: input.uid, name: input.name };
     const newPlayerUids = [...g.playerUids, input.uid];
     const allFilled = newSlots.every((s) => s.uid);
-    tx.update(ref, {
+    const ts = nowTs();
+    const patch: Partial<GameDoc> & Record<string, unknown> = {
       slots: newSlots,
       playerUids: newPlayerUids,
       status: allFilled ? "in_progress" : "waiting",
-      updatedAt: nowTs(),
-    });
+      updatedAt: ts,
+    };
+    if (allFilled) {
+      patch.turnStartedAt = ts;
+      patch.turnDeadline = ts + g.turnDurationMs;
+    }
+    tx.update(ref, patch);
   });
 }
 
@@ -203,12 +209,15 @@ export async function startGame(input: StartGameInput): Promise<void> {
     if (g.status !== "waiting") return;
     const filled = g.slots.filter((s) => s.uid);
     if (filled.length < 2) throw new Error("TOO_FEW_PLAYERS");
+    const startedAt = nowTs();
     tx.update(ref, {
       slots: filled,
       numSlots: filled.length,
       playerUids: filled.map((s) => s.uid as string),
       status: "in_progress",
-      updatedAt: nowTs(),
+      turnStartedAt: startedAt,
+      turnDeadline: startedAt + g.turnDurationMs,
+      updatedAt: startedAt,
     });
   });
 }
