@@ -83,6 +83,7 @@ export interface AppState {
   pendingTen10kSelection: number[];
   lastSeenRollId: string | null;
   isAnimatingRoll: boolean;
+  lastError: string | null;
 }
 
 const initialState: AppState = {
@@ -97,6 +98,7 @@ const initialState: AppState = {
   pendingTen10kSelection: [],
   lastSeenRollId: null,
   isAnimatingRoll: false,
+  lastError: null,
 };
 
 export const state: AppState = { ...initialState };
