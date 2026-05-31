@@ -222,6 +222,41 @@ export async function startGame(input: StartGameInput): Promise<void> {
   });
 }
 
+export interface AdvanceTurnInput {
+  code: string;
+  byUid: string;
+}
+
+/**
+ * Rotate `current` to the next slot and stamp the turn deadline. Only the
+ * player whose turn it currently is may call this. Mode-specific cleanup
+ * (craps point reset, ten banking, etc.) is NOT performed here — that ports
+ * later with the play screen. This op is the substrate for Phase 2's turn
+ * timer + reconnection work.
+ *
+ * Note: `turnDeadline` is a client-computed `Date.now() + duration`. Real
+ * Firestore's `serverTimestamp()` sentinel cannot be used in arithmetic, so
+ * we accept small clock-skew on the deadline.
+ *
+ * Throws stable strings: `ROOM_NOT_FOUND`, `NOT_IN_PROGRESS`, `NOT_YOUR_TURN`.
+ */
+export async function advanceTurn(input: AdvanceTurnInput): Promise<void> {
+  await updateGameTx(input.code, (g, commit) => {
+    if (g.status !== "in_progress") throw new Error("NOT_IN_PROGRESS");
+    const currentSlot = g.slots[g.current];
+    if (!currentSlot || currentSlot.uid !== input.byUid) {
+      throw new Error("NOT_YOUR_TURN");
+    }
+    const nextCurrent = (g.current + 1) % g.numSlots;
+    const startedAt = nowTs();
+    commit({
+      current: nextCurrent,
+      turnStartedAt: startedAt,
+      turnDeadline: startedAt + g.turnDurationMs,
+    });
+  });
+}
+
 export interface LeaveGameInput {
   code: string;
   uid: string;

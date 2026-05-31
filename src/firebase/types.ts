@@ -63,5 +63,7 @@ export type OpError =
   | "SLOT_TAKEN"
   | "NOT_HOST"
   | "TOO_FEW_PLAYERS"
+  | "NOT_IN_PROGRESS"
+  | "NOT_YOUR_TURN"
   | "CODE_GEN_FAILED"
   | "NOT_IMPLEMENTED";
