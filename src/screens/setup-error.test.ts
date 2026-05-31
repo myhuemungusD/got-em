@@ -62,6 +62,16 @@ describe("setup-error mount", () => {
     expect(btn?.textContent).toBe("Reload");
     cleanup();
   });
+
+  it("announces the error via role=alert and focuses the Reload button on mount", () => {
+    const root = makeRoot();
+    const cleanup = mount(root);
+    const msg = root.querySelector<HTMLParagraphElement>("p.setup-error__msg");
+    expect(msg?.getAttribute("role")).toBe("alert");
+    const btn = root.querySelector<HTMLButtonElement>("#setup-error-reload")!;
+    expect(document.activeElement).toBe(btn);
+    cleanup();
+  });
 });
 
 describe("setup-error reactivity", () => {
