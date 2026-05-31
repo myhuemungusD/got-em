@@ -1,6 +1,7 @@
 import "../styles/gameover.css";
 import { setState, state, subscribe, type GameState, type Slot } from "../state";
-import { createRoom, leaveGame, subscribeGame } from "../firebase";
+import { createRoom } from "../firebase";
+import { watchRoom, leaveRoom } from "../game-bridge";
 import { rememberRoom, rememberChallengers } from "../recent";
 
 const GAMEOVER_HTML = `
@@ -84,49 +85,32 @@ export function mount(root: HTMLElement): () => void {
 
   render(root);
 
-  let roomUnsub: (() => void) | null = null;
-  const dropRoomSub = (): void => {
-    if (roomUnsub) {
-      roomUnsub();
-      roomUnsub = null;
-    }
-  };
-
   const playAgain = async (): Promise<void> => {
     const current = state.game;
     if (!current || !state.myUid) {
       setState({ screen: "mode-select" });
       return;
     }
-    dropRoomSub();
-    const uid = state.myUid;
     try {
       const code = await createRoom({
         mode: current.mode,
         numPlayers: current.numSlots,
-        hostUid: uid,
+        hostUid: state.myUid,
         hostName: state.myName,
       });
-      roomUnsub = subscribeGame(code, (doc) => {
-        setState({ game: doc ?? null });
-      });
-      setState({ currentRoom: code, game: null, screen: "lobby" });
+      // Hand the new room to the bridge — it owns the single room subscription
+      // and derives the screen (a fresh room is "waiting" → lobby).
+      setState({ currentRoom: code, game: null });
+      watchRoom(code);
     } catch {
       setState({ screen: "mode-select" });
     }
   };
 
   const goHome = async (): Promise<void> => {
-    dropRoomSub();
-    const current = state.game;
-    if (current && state.myUid) {
-      try {
-        await leaveGame({ code: current.code, uid: state.myUid });
-      } catch {
-        /* room may be finished/gone — leaving for home regardless */
-      }
-    }
-    setState({ currentRoom: null, game: null, screen: "splash" });
+    // leaveRoom() tears down the bridge subscription, clears the room, and
+    // routes to splash. The finished game needs no server-side leave.
+    await leaveRoom();
   };
 
   const onClick = (e: MouseEvent): void => {
@@ -153,7 +137,6 @@ export function mount(root: HTMLElement): () => void {
 
   return () => {
     unsubscribe();
-    dropRoomSub();
     root.removeEventListener("click", onClick);
     root.classList.remove("gameover");
     root.innerHTML = "";
