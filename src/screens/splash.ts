@@ -1,5 +1,6 @@
 import { setState, state } from "../state";
 import { joinRoom, readGame } from "../firebase";
+import { watchRoom } from "../game-bridge";
 
 interface SplashRefs {
   nameInput: HTMLInputElement;
@@ -124,7 +125,9 @@ export function mount(root: HTMLElement): () => void {
         return;
       }
       if (g.playerUids.includes(uid)) {
-        setState({ currentRoom: code, screen: "lobby" });
+        // Already a member — let the bridge subscribe and route by status.
+        setState({ currentRoom: code });
+        watchRoom(code);
         return;
       }
       if (g.status === "in_progress") {
@@ -137,7 +140,10 @@ export function mount(root: HTMLElement): () => void {
         return;
       }
       await joinRoom({ code, slotIdx: openIdx, uid, name: state.myName.trim() });
-      setState({ currentRoom: code, screen: "lobby" });
+      // The bridge owns the subscription and mirrors the doc into state.game,
+      // which the lobby renderer needs; it also derives the screen from status.
+      setState({ currentRoom: code });
+      watchRoom(code);
     } catch (err) {
       setStatus(humanError(err));
     } finally {
