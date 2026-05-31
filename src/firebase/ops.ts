@@ -30,9 +30,6 @@ import type {
 /* Backend selection                                                    */
 /* -------------------------------------------------------------------- */
 
-/** Sentinel for the `db` arg — we never read it; both backends ignore it. */
-const db: unknown = TEST_MODE ? { __mock: true } : { __prod: true };
-
 function notImpl(name: string): never {
   const e = new Error(
     `[firebase/ops] ${name} not implemented in TEST_MODE=false build yet`,
@@ -42,12 +39,12 @@ function notImpl(name: string): never {
 }
 
 function gameRef(code: string): DocRef {
-  if (TEST_MODE) return mock.doc(db, "games", code);
+  if (TEST_MODE) return mock.doc(undefined, "games", code);
   return notImpl("gameRef");
 }
 
 function runTx<R>(fn: TxFn<R>): Promise<R> {
-  if (TEST_MODE) return mock.runTransaction(db, fn);
+  if (TEST_MODE) return mock.runTransaction(undefined, fn);
   return notImpl("runTransaction");
 }
 
@@ -258,7 +255,7 @@ export async function leaveGame(input: LeaveGameInput): Promise<void> {
  */
 export async function readGame(code: string): Promise<GameDoc | undefined> {
   if (TEST_MODE) {
-    const snap = await mock.getDoc<GameDoc>(mock.doc(db, "games", code));
+    const snap = await mock.getDoc<GameDoc>(mock.doc(undefined, "games", code));
     return snap.data();
   }
   return notImpl("readGame");
@@ -277,9 +274,12 @@ export function subscribeGame(
   onNext: (doc: GameDoc | undefined) => void,
 ): Unsubscribe {
   if (TEST_MODE) {
-    return mock.onSnapshot<GameDoc>(mock.doc(db, "games", code), (snap) => {
-      onNext(snap.data());
-    });
+    return mock.onSnapshot<GameDoc>(
+      mock.doc(undefined, "games", code),
+      (snap) => {
+        onNext(snap.data());
+      },
+    );
   }
   return notImpl("subscribeGame");
 }
@@ -297,7 +297,7 @@ export async function updateGameTx<R = void>(
   code: string,
   reducer: (
     doc: GameDoc,
-    commit: (patch: Partial<GameDoc> & Record<string, unknown>) => void,
+    commit: (patch: Partial<GameDoc>) => void,
   ) => R | Promise<R>,
 ): Promise<R> {
   return runTx<R>(async (tx) => {
@@ -305,7 +305,7 @@ export async function updateGameTx<R = void>(
     const snap = await tx.get(ref);
     if (!snap.exists()) throw new Error("ROOM_NOT_FOUND");
     const cur = snap.data() as GameDoc;
-    const commit = (patch: Partial<GameDoc> & Record<string, unknown>): void => {
+    const commit = (patch: Partial<GameDoc>): void => {
       tx.update(ref, { ...patch, updatedAt: nowTs() });
     };
     return reducer(cur, commit);
