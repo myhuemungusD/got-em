@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import {
   createRoom,
   joinRoom,
+  leaveGame,
   startGame,
   readGame,
   updateGameTx,
@@ -78,7 +79,25 @@ describe("lockWagers", () => {
     const code = await lobbyOfTwo();
     await expect(
       lockWagers({ code, hostUid: "u1", amount: -5 }),
-    ).rejects.toThrow("INSUFFICIENT_CHIPS");
+    ).rejects.toThrow("INVALID_WAGER");
+  });
+
+  it("rejects a NaN buy-in without mutating any chips", async () => {
+    const code = await lobbyOfTwo();
+    await expect(
+      lockWagers({ code, hostUid: "u1", amount: Number.NaN }),
+    ).rejects.toThrow("INVALID_WAGER");
+    const doc = (await readGame(code)) as GameDoc;
+    expect(doc.wager).toBeNull();
+    expect(doc.slots[0]!.chips).toBe(100);
+    expect(doc.slots[1]!.chips).toBe(100);
+  });
+
+  it("rejects a fractional buy-in", async () => {
+    const code = await lobbyOfTwo();
+    await expect(
+      lockWagers({ code, hostUid: "u1", amount: 12.5 }),
+    ).rejects.toThrow("INVALID_WAGER");
   });
 
   it("rejects a non-host caller", async () => {
@@ -102,6 +121,19 @@ describe("lockWagers", () => {
     await expect(
       lockWagers({ code, hostUid: "u1", amount: 10 }),
     ).rejects.toThrow("ALREADY_STARTED");
+  });
+
+  it("freezes the roster: no new joiners once a wager is locked", async () => {
+    // lobbyOfTwo leaves slot 2 (idx 2) open in a 3-slot room.
+    const code = await lobbyOfTwo();
+    await lockWagers({ code, hostUid: "u1", amount: 25 });
+    await expect(
+      joinRoom({ code, slotIdx: 2, uid: "u3", name: "Cara" }),
+    ).rejects.toThrow("WAGER_LOCKED");
+    // Pot accounting is untouched by the rejected join.
+    const doc = (await readGame(code)) as GameDoc;
+    expect(doc.wager?.total).toBe(50);
+    expect(doc.playerUids).toEqual(["u1", "u2"]);
   });
 
   it("throws ROOM_NOT_FOUND for an unknown code", async () => {
@@ -201,5 +233,30 @@ describe("refundWagers", () => {
     await expect(refundWagers({ code: "ZZZZ" })).rejects.toThrow(
       "ROOM_NOT_FOUND",
     );
+  });
+});
+
+describe("roster freeze on leave", () => {
+  it("blocks a charged player from leaving a locked lobby", async () => {
+    const code = await lobbyOfTwo();
+    await lockWagers({ code, hostUid: "u1", amount: 25 });
+    await expect(leaveGame({ code, uid: "u2" })).rejects.toThrow(
+      "WAGER_LOCKED",
+    );
+    // The pot and roster are untouched by the rejected leave.
+    const doc = (await readGame(code)) as GameDoc;
+    expect(doc.wager?.total).toBe(50);
+    expect(doc.playerUids).toEqual(["u1", "u2"]);
+    expect(doc.slots[1]!.chips).toBe(75); // still charged, not reset to 100
+  });
+
+  it("releases the roster after a refund settles the pot", async () => {
+    const code = await lobbyOfTwo();
+    await lockWagers({ code, hostUid: "u1", amount: 25 });
+    await refundWagers({ code }); // settled = true, chips returned
+    // Now leaving is allowed again — the pot is inert.
+    await leaveGame({ code, uid: "u2" });
+    const doc = (await readGame(code)) as GameDoc;
+    expect(doc.playerUids).toEqual(["u1"]);
   });
 });
