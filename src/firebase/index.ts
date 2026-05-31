@@ -16,6 +16,7 @@ export {
   genCode,
   lockWagers,
   settlePot,
+  refundWagers,
 } from "./ops";
 export type {
   CreateRoomInput,
@@ -25,6 +26,7 @@ export type {
   LeaveGameInput,
   LockWagersInput,
   SettlePotInput,
+  RefundWagersInput,
 } from "./ops";
 
 export { TEST_MODE } from "./mode";

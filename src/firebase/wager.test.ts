@@ -7,6 +7,7 @@ import {
   updateGameTx,
   lockWagers,
   settlePot,
+  refundWagers,
 } from "./index";
 import { __resetMock } from "./mock";
 import type { GameDoc } from "./types";
@@ -156,6 +157,48 @@ describe("settlePot", () => {
 
   it("throws ROOM_NOT_FOUND for an unknown code", async () => {
     await expect(settlePot({ code: "ZZZZ" })).rejects.toThrow(
+      "ROOM_NOT_FOUND",
+    );
+  });
+});
+
+describe("refundWagers", () => {
+  it("returns each contribution, flips settled, leaves paidTo null", async () => {
+    const code = await lobbyOfTwo();
+    await lockWagers({ code, hostUid: "u1", amount: 25 }); // both at 75
+    await refundWagers({ code });
+    const doc = (await readGame(code)) as GameDoc;
+
+    expect(doc.slots[0].chips).toBe(100);
+    expect(doc.slots[1].chips).toBe(100);
+    expect(doc.wager?.settled).toBe(true);
+    expect(doc.wager?.paidTo).toBeNull();
+  });
+
+  it("is idempotent — a second refund throws ALREADY_SETTLED", async () => {
+    const code = await lobbyOfTwo();
+    await lockWagers({ code, hostUid: "u1", amount: 25 });
+    await refundWagers({ code });
+    await expect(refundWagers({ code })).rejects.toThrow("ALREADY_SETTLED");
+    const doc = (await readGame(code)) as GameDoc;
+    // Not refunded twice.
+    expect(doc.slots[0].chips).toBe(100);
+  });
+
+  it("rejects when no wager is locked", async () => {
+    const code = await lobbyOfTwo();
+    await expect(refundWagers({ code })).rejects.toThrow("WAGER_NOT_LOCKED");
+  });
+
+  it("rejects refunding a finished game (that is settlePot's job)", async () => {
+    const code = await lobbyOfTwo();
+    await lockWagers({ code, hostUid: "u1", amount: 25 });
+    await finish(code, "u2");
+    await expect(refundWagers({ code })).rejects.toThrow("INVALID_SETTLEMENT");
+  });
+
+  it("throws ROOM_NOT_FOUND for an unknown code", async () => {
+    await expect(refundWagers({ code: "ZZZZ" })).rejects.toThrow(
       "ROOM_NOT_FOUND",
     );
   });

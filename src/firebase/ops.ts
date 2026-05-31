@@ -337,6 +337,36 @@ export async function settlePot(input: SettlePotInput): Promise<void> {
   });
 }
 
+export interface RefundWagersInput {
+  code: string;
+}
+
+/**
+ * Return every contribution to its contributor (Phase 2 dead-game cleanup).
+ * The pot is preserved (not nulled) but marked `settled = true` with
+ * `paidTo = null`, so the same idempotency guard that protects settlePot
+ * also blocks a double-refund.
+ *
+ * Asserts (in order): room exists, a wager is locked, not already settled,
+ * and the game is NOT finished (a finished game is settlePot's job).
+ */
+export async function refundWagers(input: RefundWagersInput): Promise<void> {
+  await updateGameTx(input.code, (g, commit) => {
+    const pot = g.wager;
+    if (pot === null) throw new Error("WAGER_NOT_LOCKED");
+    if (pot.settled) throw new Error("ALREADY_SETTLED");
+    if (g.status === "finished") throw new Error("INVALID_SETTLEMENT");
+
+    const newSlots = g.slots.map((s) => {
+      if (s.uid === null) return s;
+      const back = pot.contributions[s.uid];
+      return back ? { ...s, chips: s.chips + back } : s;
+    });
+    const wager: WagerPot = { ...pot, settled: true, paidTo: null };
+    commit({ slots: newSlots, wager });
+  });
+}
+
 export interface LeaveGameInput {
   code: string;
   uid: string;
