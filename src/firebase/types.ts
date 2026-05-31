@@ -17,6 +17,7 @@ export type {
   TenState,
   RollResult,
   GameState,
+  WagerPot,
 } from "../state";
 
 import type { GameState } from "../state";
@@ -66,4 +67,9 @@ export type OpError =
   | "NOT_IN_PROGRESS"
   | "NOT_YOUR_TURN"
   | "CODE_GEN_FAILED"
+  | "INSUFFICIENT_CHIPS"
+  | "WAGER_LOCKED"
+  | "WAGER_NOT_LOCKED"
+  | "INVALID_SETTLEMENT"
+  | "ALREADY_SETTLED"
   | "NOT_IMPLEMENTED";

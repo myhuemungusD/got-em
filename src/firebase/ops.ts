@@ -57,6 +57,9 @@ function nowTs(): number {
 /* Code + slot helpers (ported from prototype)                          */
 /* -------------------------------------------------------------------- */
 
+/** Starting virtual chip stack seeded into every slot at room creation. */
+export const STARTING_CHIPS = 100;
+
 const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
 export function genCode(len = 4): string {
@@ -73,6 +76,7 @@ function emptySlots(num: number, hostUid: string, hostName: string): Slot[] {
     name: i === 0 ? hostName : "",
     score: 0,
     onBoard: false,
+    chips: STARTING_CHIPS,
   }));
 }
 
@@ -132,6 +136,7 @@ export async function createRoom(input: CreateRoomInput): Promise<string> {
         turnStartedAt: null,
         turnDeadline: null,
         turnDurationMs: 30000,
+        wager: null,
         createdAt: nowTs(),
         updatedAt: nowTs(),
         ...modeInit(mode),
@@ -277,7 +282,13 @@ export async function leaveGame(input: LeaveGameInput): Promise<void> {
     const slotIdx = g.slots.findIndex((s) => s.uid === input.uid);
     if (slotIdx < 0) return;
     const newSlots = [...g.slots];
-    newSlots[slotIdx] = { uid: null, name: "", score: 0, onBoard: false };
+    newSlots[slotIdx] = {
+      uid: null,
+      name: "",
+      score: 0,
+      onBoard: false,
+      chips: STARTING_CHIPS,
+    };
     const newPlayerUids = g.playerUids.filter((u) => u !== input.uid);
     let newHost = g.hostUid;
     if (g.hostUid === input.uid && newPlayerUids.length > 0) {

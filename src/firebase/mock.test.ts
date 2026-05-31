@@ -44,6 +44,7 @@ describe("createRoom", () => {
       name: "Alice",
       score: 0,
       onBoard: false,
+      chips: 100,
     });
     expect(stored.slots[1]!.uid).toBeNull();
     expect(stored.playerUids).toEqual(["u1"]);
@@ -101,6 +102,7 @@ describe("joinRoom", () => {
       name: "Bob",
       score: 0,
       onBoard: false,
+      chips: 100,
     });
     expect(doc.playerUids).toEqual(["u1", "u2"]);
     expect(doc.status).toBe("waiting");
