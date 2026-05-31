@@ -41,11 +41,11 @@ describe("lockWagers", () => {
     await lockWagers({ code, hostUid: "u1", amount: 25 });
     const doc = (await readGame(code)) as GameDoc;
 
-    expect(doc.slots[0].chips).toBe(75);
-    expect(doc.slots[1].chips).toBe(75);
+    expect(doc.slots[0]!.chips).toBe(75);
+    expect(doc.slots[1]!.chips).toBe(75);
     // Empty slot untouched.
-    expect(doc.slots[2].uid).toBeNull();
-    expect(doc.slots[2].chips).toBe(100);
+    expect(doc.slots[2]!.uid).toBeNull();
+    expect(doc.slots[2]!.chips).toBe(100);
 
     expect(doc.wager).toEqual({
       amount: 25,
@@ -60,7 +60,7 @@ describe("lockWagers", () => {
     const code = await lobbyOfTwo();
     await lockWagers({ code, hostUid: "u1", amount: 0 });
     const doc = (await readGame(code)) as GameDoc;
-    expect(doc.slots[0].chips).toBe(100);
+    expect(doc.slots[0]!.chips).toBe(100);
     expect(doc.wager?.total).toBe(0);
   });
 
@@ -71,7 +71,7 @@ describe("lockWagers", () => {
     ).rejects.toThrow("INSUFFICIENT_CHIPS");
     const doc = (await readGame(code)) as GameDoc;
     expect(doc.wager).toBeNull();
-    expect(doc.slots[0].chips).toBe(100);
+    expect(doc.slots[0]!.chips).toBe(100);
   });
 
   it("rejects a negative buy-in", async () => {
@@ -119,8 +119,8 @@ describe("settlePot", () => {
     await settlePot({ code });
     const doc = (await readGame(code)) as GameDoc;
 
-    expect(doc.slots[0].chips).toBe(75); // loser unchanged
-    expect(doc.slots[1].chips).toBe(125); // winner 75 + pot 50
+    expect(doc.slots[0]!.chips).toBe(75); // loser unchanged
+    expect(doc.slots[1]!.chips).toBe(125); // winner 75 + pot 50
     expect(doc.wager?.settled).toBe(true);
     expect(doc.wager?.paidTo).toBe("u2");
   });
@@ -133,7 +133,7 @@ describe("settlePot", () => {
     await expect(settlePot({ code })).rejects.toThrow("ALREADY_SETTLED");
     const doc = (await readGame(code)) as GameDoc;
     // Winner not paid twice.
-    expect(doc.slots[1].chips).toBe(125);
+    expect(doc.slots[1]!.chips).toBe(125);
   });
 
   it("rejects when no wager is locked", async () => {
@@ -169,8 +169,8 @@ describe("refundWagers", () => {
     await refundWagers({ code });
     const doc = (await readGame(code)) as GameDoc;
 
-    expect(doc.slots[0].chips).toBe(100);
-    expect(doc.slots[1].chips).toBe(100);
+    expect(doc.slots[0]!.chips).toBe(100);
+    expect(doc.slots[1]!.chips).toBe(100);
     expect(doc.wager?.settled).toBe(true);
     expect(doc.wager?.paidTo).toBeNull();
   });
@@ -182,7 +182,7 @@ describe("refundWagers", () => {
     await expect(refundWagers({ code })).rejects.toThrow("ALREADY_SETTLED");
     const doc = (await readGame(code)) as GameDoc;
     // Not refunded twice.
-    expect(doc.slots[0].chips).toBe(100);
+    expect(doc.slots[0]!.chips).toBe(100);
   });
 
   it("rejects when no wager is locked", async () => {
