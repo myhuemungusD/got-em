@@ -856,3 +856,21 @@
     transform: rotateY(180deg) translateZ(25px);
   }
 }
+
+/* ---- Wager HUD + per-player chip stack ---- */
+.wager-hud {
+  margin: 0 16px 8px;
+  text-align: center;
+  font-family: var(--font-display);
+  font-size: 14px;
+  letter-spacing: 0.2em;
+  color: var(--gold);
+  text-shadow: 0 0 8px rgba(255, 193, 7, 0.25);
+}
+
+.player-chip .player-chips {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--gold);
+  letter-spacing: 0.05em;
+}

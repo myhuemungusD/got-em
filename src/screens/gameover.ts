@@ -4,12 +4,15 @@ import { createRoom } from "../firebase";
 import { watchRoom, leaveRoom, stopWatching } from "../game-bridge";
 import { rememberRoom, rememberChallengers } from "../recent";
 
+const STARTING_CHIPS = 100;
+
 const GAMEOVER_HTML = `
   <div class="winner-trophy">🏆</div>
   <div class="winner-label">Winner</div>
   <div class="winner-name" id="winner-name">PLAYER</div>
   <div class="winner-streak"></div>
   <div class="final-score" id="final-score"></div>
+  <div class="wager-result" id="wager-result" hidden></div>
   <div class="gameover-actions">
     <button class="btn btn-primary" type="button" data-action="play-again">Play Again</button>
     <button class="btn btn-secondary" type="button" data-action="new-game">New Game</button>
@@ -47,7 +50,33 @@ function renderRow(g: GameState, slot: Slot, idx: number): HTMLDivElement {
   scoreEl.textContent = formatScore(slot.score, g.mode === "ten");
 
   row.append(rank, name, scoreEl);
+
+  if (g.wager !== null) {
+    const delta = slot.chips - STARTING_CHIPS;
+    const deltaEl = document.createElement("div");
+    deltaEl.className = "final-row-delta";
+    if (delta > 0) {
+      deltaEl.classList.add("positive");
+      deltaEl.textContent = `+${delta}`;
+    } else if (delta < 0) {
+      deltaEl.classList.add("negative");
+      deltaEl.textContent = String(delta);
+    } else {
+      deltaEl.textContent = "±0";
+    }
+    row.appendChild(deltaEl);
+  }
+
   return row;
+}
+
+function wagerResultText(g: GameState): string {
+  const pot = g.wager;
+  if (!pot) return "";
+  if (!pot.settled) return "Settling pot…";
+  if (pot.paidTo === null) return "Pot refunded";
+  const winnerName = g.slots.find((s) => s.uid === pot.paidTo)?.name ?? "Winner";
+  return `${winnerName} wins ${pot.total} chips`;
 }
 
 function render(root: HTMLElement): void {
@@ -70,6 +99,17 @@ function render(root: HTMLElement): void {
   const ranked = [...g.slots].sort((a, b) => b.score - a.score);
   for (const [idx, slot] of ranked.entries()) {
     fs.appendChild(renderRow(g, slot, idx));
+  }
+
+  const wagerEl = root.querySelector<HTMLDivElement>("#wager-result");
+  if (wagerEl) {
+    if (g.wager !== null) {
+      wagerEl.hidden = false;
+      wagerEl.textContent = wagerResultText(g);
+    } else {
+      wagerEl.hidden = true;
+      wagerEl.textContent = "";
+    }
   }
 }
 
@@ -132,6 +172,19 @@ export function mount(root: HTMLElement): () => void {
     }
   };
 
+  // Keep the room subscription alive on this screen when there's an unsettled
+  // pot to wait on. The play screen's cleanup tears down its subscription
+  // BEFORE the bridge's maybeAutoSettle write can be observed, so without
+  // re-subscribing here the settled snapshot never lands and the wager line
+  // stays stuck on "Settling pot…". Scoped to the case it's needed because
+  // a blind re-sub would call leaveRoom() in tests/mocks that haven't seeded
+  // the corresponding doc.
+  const initialCode = state.currentRoom;
+  const wager = state.game?.wager;
+  const needsSettleWatch =
+    initialCode !== null && wager !== null && wager !== undefined && !wager.settled;
+  const stopWatch = needsSettleWatch ? watchRoom(initialCode) : null;
+
   const unsubscribe = subscribe(() => {
     render(root);
   });
@@ -139,6 +192,7 @@ export function mount(root: HTMLElement): () => void {
   root.addEventListener("click", onClick);
 
   return () => {
+    if (stopWatch) stopWatch();
     unsubscribe();
     root.removeEventListener("click", onClick);
     root.classList.remove("gameover");

@@ -10,7 +10,7 @@
  * screen cuts — the prototype's ordering, preserved exactly.
  */
 import { setState, state } from "./state";
-import { subscribeGame } from "./firebase";
+import { subscribeGame, settlePot } from "./firebase";
 import type { GameDoc, GameState, Slot, Unsubscribe } from "./firebase";
 
 export interface WatchRoomHooks {
@@ -77,6 +77,26 @@ async function handleDoc(doc: GameDoc | undefined, hooks: WatchRoomHooks): Promi
   }
 
   setState(patch);
+
+  maybeAutoSettle(doc);
+}
+
+/**
+ * Host-only: when a wagered game finishes with an unsettled pot, fire
+ * settlePot exactly once. Idempotent on the server (ALREADY_SETTLED is
+ * swallowed) so re-renders / late snapshots can't double-pay.
+ */
+function maybeAutoSettle(doc: GameDoc): void {
+  if (doc.status !== "finished") return;
+  if (doc.wager === null || doc.wager.settled) return;
+  if (doc.winner === null) return;
+  if (state.myUid !== doc.hostUid) return;
+  void settlePot({ code: doc.code }).catch((err: unknown) => {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg !== "ALREADY_SETTLED") {
+      setState({ lastError: msg });
+    }
+  });
 }
 
 export function watchRoom(code: string, hooks: WatchRoomHooks = {}): () => void {

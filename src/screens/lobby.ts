@@ -1,7 +1,7 @@
 import "../styles/lobby.css";
 import { state, subscribe } from "../state";
 import type { GameState } from "../state";
-import { joinRoom, startGame, leaveGame } from "../firebase";
+import { joinRoom, startGame, leaveGame, lockWagers, refundWagers } from "../firebase";
 import { openInviteModal } from "../components";
 import { leaveRoom } from "../game-bridge";
 
@@ -26,6 +26,17 @@ const LOBBY_HTML = `
         <span class="slots-mode" id="lobby-mode"></span>
       </div>
       <div id="lobby-slots"></div>
+    </div>
+    <div class="wager-section" id="wager-section" hidden>
+      <div class="wager-row">
+        <label for="wager-amount">Buy-in (chips)</label>
+        <input id="wager-amount" class="field" type="number" min="0" max="100" step="1" value="0" inputmode="numeric" />
+      </div>
+      <div class="wager-actions">
+        <button class="btn btn-secondary" type="button" data-action="lock-wager" id="wager-lock">Lock Wager</button>
+        <button class="btn btn-ghost" type="button" data-action="refund-wager" id="wager-refund" hidden>Refund Pot</button>
+      </div>
+      <div class="wager-state" id="wager-state"></div>
     </div>
     <div class="lobby-waiting" id="lobby-waiting"></div>
     <div class="lobby-status" id="lobby-status" role="status" aria-live="polite"></div>
@@ -53,6 +64,9 @@ function escHtml(s: string): string {
 function humanError(err: unknown): string {
   const msg = err instanceof Error ? err.message : String(err);
   if (msg === "WAGER_LOCKED") return "Pot is locked — host must refund first";
+  if (msg === "INVALID_WAGER") return "Buy-in must be a non-negative whole number";
+  if (msg === "INSUFFICIENT_CHIPS") return "Someone can't afford that buy-in";
+  if (msg === "WAGER_NOT_LOCKED") return "No pot to refund";
   if (msg === "SLOT_TAKEN") return "That seat was just taken";
   if (msg === "ALREADY_STARTED") return "Game already started";
   if (msg === "BAD_SLOT") return "Invalid seat";
@@ -82,6 +96,11 @@ export function mount(root: HTMLElement): () => void {
   const startBtn = root.querySelector<HTMLButtonElement>("#lobby-start")!;
   const inviteBtn = root.querySelector<HTMLButtonElement>('[data-action="invite"]')!;
   const copyBtn = root.querySelector<HTMLButtonElement>('[data-action="copy-code"]')!;
+  const wagerSection = root.querySelector<HTMLDivElement>("#wager-section")!;
+  const wagerAmount = root.querySelector<HTMLInputElement>("#wager-amount")!;
+  const wagerLockBtn = root.querySelector<HTMLButtonElement>("#wager-lock")!;
+  const wagerRefundBtn = root.querySelector<HTMLButtonElement>("#wager-refund")!;
+  const wagerStateEl = root.querySelector<HTMLDivElement>("#wager-state")!;
   const leaveBtns = Array.from(
     root.querySelectorAll<HTMLButtonElement>('[data-action="leave"]'),
   );
@@ -171,6 +190,43 @@ export function mount(root: HTMLElement): () => void {
     }
   };
 
+  const lockWager = async (): Promise<void> => {
+    const g = state.game;
+    if (!g || busy || !state.myUid) return;
+    const raw = Number(wagerAmount.value);
+    if (!Number.isInteger(raw) || raw < 0) {
+      setStatus("Buy-in must be a non-negative whole number");
+      return;
+    }
+    busy = true;
+    setStatus("");
+    wagerLockBtn.disabled = true;
+    try {
+      await lockWagers({ code: g.code, hostUid: state.myUid, amount: raw });
+    } catch (err) {
+      setStatus(humanError(err));
+    } finally {
+      busy = false;
+      wagerLockBtn.disabled = false;
+    }
+  };
+
+  const refundWager = async (): Promise<void> => {
+    const g = state.game;
+    if (!g || busy) return;
+    busy = true;
+    setStatus("");
+    wagerRefundBtn.disabled = true;
+    try {
+      await refundWagers({ code: g.code });
+    } catch (err) {
+      setStatus(humanError(err));
+    } finally {
+      busy = false;
+      wagerRefundBtn.disabled = false;
+    }
+  };
+
   const invite = (): void => {
     const g = state.game;
     if (!g) return;
@@ -238,6 +294,31 @@ export function mount(root: HTMLElement): () => void {
     const need = total - filled;
 
     const isHost = myUid !== null && myUid === g.hostUid;
+
+    // Wager controls: visible to host while the room is waiting.
+    if (isHost) {
+      wagerSection.hidden = false;
+      const pot = g.wager;
+      if (pot === null) {
+        wagerLockBtn.hidden = false;
+        wagerRefundBtn.hidden = true;
+        wagerAmount.disabled = false;
+        wagerStateEl.textContent = "Optional buy-in. Lock before starting.";
+      } else if (!pot.settled) {
+        wagerLockBtn.hidden = true;
+        wagerRefundBtn.hidden = false;
+        wagerAmount.disabled = true;
+        wagerAmount.value = String(pot.amount);
+        wagerStateEl.textContent = `Pot locked: ${pot.total} chips`;
+      } else {
+        wagerLockBtn.hidden = true;
+        wagerRefundBtn.hidden = true;
+        wagerStateEl.textContent = "Pot was refunded";
+      }
+    } else {
+      wagerSection.hidden = true;
+    }
+
     if (isHost) {
       waitingEl.innerHTML =
         need > 0
@@ -264,6 +345,12 @@ export function mount(root: HTMLElement): () => void {
   copyBtn.addEventListener("click", copyCode);
   startBtn.addEventListener("click", () => {
     void start();
+  });
+  wagerLockBtn.addEventListener("click", () => {
+    void lockWager();
+  });
+  wagerRefundBtn.addEventListener("click", () => {
+    void refundWager();
   });
   for (const btn of leaveBtns) {
     btn.addEventListener("click", () => {
