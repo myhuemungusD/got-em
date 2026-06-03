@@ -27,6 +27,7 @@ const PLAY_HTML = `
     <span class="icon-btn" aria-hidden="true" style="visibility:hidden"></span>
   </div>
   <div class="play-hud">
+    <div class="wager-hud" id="wager-hud" hidden></div>
     <div class="scoreboard" id="scoreboard"></div>
   </div>
   <div class="turn-banner" id="turn-banner"></div>
@@ -129,6 +130,7 @@ export function mount(root: HTMLElement): () => void {
   const modeEl = root.querySelector<HTMLElement>("#play-mode")!;
   const roomEl = root.querySelector<HTMLElement>("#play-room")!;
   const scoreboardEl = root.querySelector<HTMLElement>("#scoreboard")!;
+  const wagerHudEl = root.querySelector<HTMLElement>("#wager-hud")!;
   const bannerEl = root.querySelector<HTMLElement>("#turn-banner")!;
   const keepBarEl = root.querySelector<HTMLElement>("#keep-bar")!;
   const turnPointsEl = root.querySelector<HTMLElement>("#turn-points")!;
@@ -328,8 +330,24 @@ export function mount(root: HTMLElement): () => void {
       nameRow.append(dot, name);
 
       chip.append(nameRow, scoreBlock(g, s), detailLine(g, s));
+      if (g.wager !== null) {
+        const chipsLine = document.createElement("div");
+        chipsLine.className = "player-chips";
+        chipsLine.textContent = `${s.chips}c`;
+        chip.appendChild(chipsLine);
+      }
       scoreboardEl.appendChild(chip);
     });
+  }
+
+  function renderWagerHud(g: GameState): void {
+    const pot = g.wager;
+    if (pot === null || pot.settled) {
+      wagerHudEl.hidden = true;
+      return;
+    }
+    wagerHudEl.hidden = false;
+    wagerHudEl.textContent = `POT · ${pot.total} chips`;
   }
 
   function renderBanner(g: GameState): void {
@@ -502,6 +520,7 @@ export function mount(root: HTMLElement): () => void {
     // which re-enters render() to draw the settled dice.
     maybeAnimateLocalRoll(g);
 
+    renderWagerHud(g);
     renderScoreboard(g);
     renderBanner(g);
     renderArena(g);

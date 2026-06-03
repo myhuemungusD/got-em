@@ -168,3 +168,31 @@
     font-size: 48px;
   }
 }
+
+/* ---- Wager result + per-row chip delta ---- */
+.wager-result {
+  margin: 12px 0 4px;
+  text-align: center;
+  font-family: var(--font-display);
+  font-size: 16px;
+  letter-spacing: 0.18em;
+  color: var(--gold);
+  text-shadow: 0 0 12px rgba(255, 193, 7, 0.2);
+}
+
+.final-row-delta {
+  margin-left: 12px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--text-mute);
+  min-width: 44px;
+  text-align: right;
+}
+
+.final-row-delta.positive {
+  color: var(--green);
+}
+
+.final-row-delta.negative {
+  color: var(--red);
+}

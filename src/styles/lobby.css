@@ -287,3 +287,46 @@
     opacity: 1;
   }
 }
+
+/* ---- Wager controls (host-only, while waiting) ---- */
+.wager-section {
+  margin-top: 16px;
+  padding: 14px 16px;
+  background: var(--bg-elev-1);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.wager-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.wager-row label {
+  font-size: 13px;
+  color: var(--text-mute);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.wager-row input {
+  width: 92px;
+  text-align: center;
+}
+
+.wager-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.wager-state {
+  font-size: 12px;
+  color: var(--gold);
+  letter-spacing: 0.05em;
+  min-height: 16px;
+}
