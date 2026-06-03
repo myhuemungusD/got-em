@@ -7,16 +7,15 @@
  * a direct swap, not a redesign.
  *
  * Routing: when `TEST_MODE` is true (vitest, `vite dev` without keys) every
- * call hits the in-memory `mock` backend. Otherwise it would hit real
- * Firestore — but the real wiring is **not** in this chunk. The prod
- * branches throw `NOT_IMPLEMENTED` so callers can be built and tested now,
- * and we wire real Firestore in a follow-up that also lands `firestore.rules`.
+ * call hits the in-memory `mock` backend. Otherwise calls are routed to the
+ * real Firestore backend (`./real`), which lands alongside `firestore.rules`.
  *
  * All writes go through `runTransaction`. There is no exported raw
  * `setDoc`/`updateDoc` — that's the security invariant from `claude.md`.
  */
 import { TEST_MODE } from "./mode";
 import * as mock from "./mock";
+import * as real from "./real";
 import type {
   DocRef,
   GameDoc,
@@ -31,27 +30,34 @@ import type {
 /* Backend selection                                                    */
 /* -------------------------------------------------------------------- */
 
-function notImpl(name: string): never {
-  const e = new Error(
-    `[firebase/ops] ${name} not implemented in TEST_MODE=false build yet`,
-  );
-  (e as Error & { code?: string }).code = "NOT_IMPLEMENTED";
-  throw e;
-}
-
 function gameRef(code: string): DocRef {
   if (TEST_MODE) return mock.doc(undefined, "games", code);
-  return notImpl("gameRef");
+  return real.doc(undefined, "games", code);
 }
 
 function runTx<R>(fn: TxFn<R>): Promise<R> {
   if (TEST_MODE) return mock.runTransaction(undefined, fn);
-  return notImpl("runTransaction");
+  return real.runTransaction(undefined, fn);
 }
 
+/**
+ * Current timestamp, as a plain epoch-millis `number`, on BOTH backends.
+ *
+ * The mock's `serverTimestamp()` already returns `Date.now()`. For the real
+ * client we deliberately do NOT use the Firestore `serverTimestamp()`
+ * sentinel here: ops compute turn deadlines as `nowTs() + turnDurationMs`,
+ * and a `FieldValue` sentinel cannot be used in arithmetic. So both
+ * `turnStartedAt`/`turnDeadline` AND `createdAt`/`updatedAt` are stamped
+ * with the client clock. This mirrors the prototype's documented behavior
+ * (deadlines are client-computed; small clock skew is accepted). The
+ * `real.serverTimestamp()` sentinel remains available for any future field
+ * that wants true server time without arithmetic.
+ */
 function nowTs(): number {
+  // mock.serverTimestamp() returns Date.now(); the real branch uses the
+  // same client clock (see doc comment) so deadline arithmetic works.
   if (TEST_MODE) return mock.serverTimestamp();
-  return notImpl("serverTimestamp");
+  return Date.now();
 }
 
 /* -------------------------------------------------------------------- */
@@ -440,7 +446,8 @@ export async function readGame(code: string): Promise<GameDoc | undefined> {
     const snap = await mock.getDoc<GameDoc>(mock.doc(undefined, "games", code));
     return snap.data();
   }
-  return notImpl("readGame");
+  const snap = await real.getDoc<GameDoc>(real.doc(undefined, "games", code));
+  return snap.data();
 }
 
 /**
@@ -463,7 +470,12 @@ export function subscribeGame(
       },
     );
   }
-  return notImpl("subscribeGame");
+  return real.onSnapshot<GameDoc>(
+    real.doc(undefined, "games", code),
+    (snap) => {
+      onNext(snap.data());
+    },
+  );
 }
 
 /**

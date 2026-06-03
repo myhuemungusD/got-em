@@ -4,10 +4,10 @@
  * and set on `state.myUid` by boot — leaf screens never mint their own uid.
  *
  * Mirrors the prototype boot flow (`prototypes/gotem.html` ~1092–1118): in a
- * real build this is where `signInAnonymously` resolves a Firebase uid. That
- * wiring lands in a separate chunk together with `firestore.rules`; the prod
- * branch here throws `NOT_IMPLEMENTED` (same pattern as `firebase/ops.ts`)
- * so TEST_MODE is fully usable and the real path is clearly stubbed.
+ * real build this is where `signInAnonymously` resolves a Firebase uid. The
+ * prod branch lazily imports `firebase/real` and delegates to `signInAnon()`
+ * (dynamic import keeps the Firebase SDK out of the TEST_MODE bundle), while
+ * TEST_MODE resolves a stable localStorage-backed uid with no network.
  */
 import { TEST_MODE } from "./firebase/mode";
 
@@ -15,14 +15,6 @@ const UID_KEY = "gotem_uid";
 const NAME_KEY = "streetdice.myName";
 
 let memoryUid: string | null = null;
-
-function notImpl(name: string): never {
-  const e = new Error(
-    `[auth] ${name} not implemented in TEST_MODE=false build yet`,
-  );
-  (e as Error & { code?: string }).code = "NOT_IMPLEMENTED";
-  throw e;
-}
 
 function readStoredUid(): string | null {
   try {
@@ -50,8 +42,11 @@ function persistUid(uid: string): void {
  * Guards localStorage access so a throwing storage falls back to a session
  * in-memory uid.
  */
-export function ensureAuth(): Promise<string> {
-  if (!TEST_MODE) notImpl("ensureAuth");
+export async function ensureAuth(): Promise<string> {
+  if (!TEST_MODE) {
+    const { signInAnon } = await import("./firebase/real");
+    return signInAnon();
+  }
 
   if (memoryUid) return Promise.resolve(memoryUid);
 
