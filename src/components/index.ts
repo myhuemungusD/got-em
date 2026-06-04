@@ -5,3 +5,5 @@ export { createHand } from "./hand";
 export type { Hand, HandOpts } from "./hand";
 export { openInviteModal } from "./invite-modal";
 export { makeQrSvg } from "./qr";
+export { getSfx } from "./sfx";
+export type { Sfx, SfxName } from "./sfx";

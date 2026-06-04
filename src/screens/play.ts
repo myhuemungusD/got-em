@@ -10,7 +10,7 @@ import {
   rollAgainTen,
   advanceTurn,
 } from "../firebase";
-import { createHand, renderDice, clearDice, haptic } from "../components";
+import { createHand, renderDice, clearDice, haptic, getSfx } from "../components";
 import type { Hand } from "../components";
 import { watchRoom, isMyTurn, currentSlot, leaveRoom } from "../game-bridge";
 import { ten10kScoreCombo } from "../scoring/farkle";
@@ -164,6 +164,9 @@ export function mount(root: HTMLElement): () => void {
   let shownRollId: string | null = state.lastSeenRollId;
   let resultRollId: string | null = null;
   let resultTimer: ReturnType<typeof setTimeout> | null = null;
+  let lastAnimatingRoll = state.isAnimatingRoll;
+  let settleRollId: string | null = state.lastSeenRollId;
+  let bustRollId: string | null = null;
 
   function setStatus(text: string, kind: string): void {
     if (resultTimer) clearTimeout(resultTimer);
@@ -247,17 +250,21 @@ export function mount(root: HTMLElement): () => void {
     if (!(e.target instanceof Element)) return;
     const el = e.target.closest<HTMLElement>("[data-action]");
     if (!el) return;
-    switch (el.dataset["action"]) {
+    const action = el.dataset["action"];
+    switch (action) {
       case "leave":
         void leaveRoom();
         return;
       case "roll":
+        getSfx().play("tap");
         onRoll();
         return;
       case "ten-bank":
+        getSfx().play("tap");
         onBank();
         return;
       case "ten-roll-again":
+        getSfx().play("tap");
         onRollAgain();
         return;
     }
@@ -604,6 +611,27 @@ export function mount(root: HTMLElement): () => void {
     // Animate a fresh local roll first; finishing it flips isAnimatingRoll,
     // which re-enters render() to draw the settled dice.
     maybeAnimateLocalRoll(g);
+
+    if (s.isAnimatingRoll && !lastAnimatingRoll) getSfx().play("dice-roll");
+    if (
+      !s.isAnimatingRoll &&
+      g.lastRollId &&
+      g.lastRollId !== settleRollId
+    ) {
+      settleRollId = g.lastRollId;
+      getSfx().play("dice-settle");
+    }
+    lastAnimatingRoll = s.isAnimatingRoll;
+
+    if (
+      g.lastResult?.outcome === "farkle" &&
+      g.lastRollId &&
+      g.lastRollId !== bustRollId &&
+      !s.isAnimatingRoll
+    ) {
+      bustRollId = g.lastRollId;
+      getSfx().play("bust");
+    }
 
     renderWagerHud(g);
     renderScoreboard(g);

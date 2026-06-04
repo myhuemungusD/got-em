@@ -3,6 +3,7 @@ import { setState, state, subscribe, type GameState, type Slot } from "../state"
 import { createRoom } from "../firebase";
 import { watchRoom, leaveRoom, stopWatching } from "../game-bridge";
 import { rememberRoom, rememberChallengers } from "../recent";
+import { getSfx } from "../components";
 
 const STARTING_CHIPS = 100;
 
@@ -121,6 +122,7 @@ export function mount(root: HTMLElement): () => void {
   if (g) {
     rememberRoom(g.code);
     if (state.myUid) rememberChallengers(g, state.myUid);
+    getSfx().play(state.myUid && state.myUid === g.winner ? "win" : "lose");
   }
 
   render(root);

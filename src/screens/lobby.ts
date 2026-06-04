@@ -2,7 +2,7 @@ import "../styles/lobby.css";
 import { state, subscribe } from "../state";
 import type { GameState } from "../state";
 import { joinRoom, startGame, leaveGame, lockWagers, refundWagers } from "../firebase";
-import { openInviteModal } from "../components";
+import { openInviteModal, getSfx } from "../components";
 import { leaveRoom } from "../game-bridge";
 
 const LOBBY_HTML = `
@@ -164,6 +164,7 @@ export function mount(root: HTMLElement): () => void {
     startBtn.disabled = true;
     try {
       await startGame({ code: g.code, hostUid: state.myUid });
+      getSfx().play("tap");
     } catch (err) {
       setStatus(humanError(err));
     } finally {
@@ -203,6 +204,7 @@ export function mount(root: HTMLElement): () => void {
     wagerLockBtn.disabled = true;
     try {
       await lockWagers({ code: g.code, hostUid: state.myUid, amount: raw });
+      getSfx().play("lock");
     } catch (err) {
       setStatus(humanError(err));
     } finally {
