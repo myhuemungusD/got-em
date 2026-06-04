@@ -2,7 +2,14 @@ import "../styles/play.css";
 
 import { setState, state, subscribe } from "../state";
 import type { AppState, GameMode, GameState, Slot, TenState } from "../state";
-import { rollCraps, rollClo, rollTen, bankTen, rollAgainTen } from "../firebase";
+import {
+  rollCraps,
+  rollClo,
+  rollTen,
+  bankTen,
+  rollAgainTen,
+  advanceTurn,
+} from "../firebase";
 import { createHand, renderDice, clearDice, haptic } from "../components";
 import type { Hand } from "../components";
 import { watchRoom, isMyTurn, currentSlot, leaveRoom } from "../game-bridge";
@@ -30,6 +37,7 @@ const PLAY_HTML = `
     <div class="wager-hud" id="wager-hud" hidden></div>
     <div class="scoreboard" id="scoreboard"></div>
   </div>
+  <div class="turn-timer" id="turn-timer" hidden aria-live="off"></div>
   <div class="turn-banner" id="turn-banner"></div>
   <main class="table">
     <div class="hand-area">
@@ -132,6 +140,7 @@ export function mount(root: HTMLElement): () => void {
   const scoreboardEl = root.querySelector<HTMLElement>("#scoreboard")!;
   const wagerHudEl = root.querySelector<HTMLElement>("#wager-hud")!;
   const bannerEl = root.querySelector<HTMLElement>("#turn-banner")!;
+  const timerEl = root.querySelector<HTMLElement>("#turn-timer")!;
   const keepBarEl = root.querySelector<HTMLElement>("#keep-bar")!;
   const turnPointsEl = root.querySelector<HTMLElement>("#turn-points")!;
   const diceEl = root.querySelector<HTMLElement>("#dice")!;
@@ -492,6 +501,82 @@ export function mount(root: HTMLElement): () => void {
     if (state.isAnimatingRoll) lockActions(true);
   }
 
+  // Auto-advance: avoid stacking calls per turn. The "key" for a turn is
+  // turnStartedAt — once it changes server-side the lock resets.
+  let advanceAttemptKey: number | null = null;
+  const prefersReducedMotion =
+    typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  // 500ms tolerance prevents flicker around the deadline boundary.
+  const CLOCK_SKEW_MS = 500;
+  // Non-current players wait this long after expiry before piling on, giving
+  // the current player's auto-advance a chance to land first.
+  const NON_CURRENT_GRACE_MS = 1000;
+
+  function formatRemaining(ms: number): string {
+    const clamped = Math.max(0, ms);
+    const totalSec = Math.ceil(clamped / 1000);
+    const m = Math.floor(totalSec / 60);
+    const s = totalSec % 60;
+    return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  }
+
+  function tickTimer(): void {
+    const g = state.game;
+    if (!g || g.status !== "in_progress" || g.turnDeadline === null) {
+      timerEl.hidden = true;
+      timerEl.textContent = "";
+      timerEl.className = "turn-timer";
+      return;
+    }
+    const now = Date.now();
+    const remainingMs = g.turnDeadline - now;
+    const mine = isMyTurn(g, state.myUid);
+
+    timerEl.hidden = false;
+    if (mine) {
+      const text = formatRemaining(remainingMs);
+      const danger = remainingMs <= 5000;
+      const warn = !danger && remainingMs <= 10000;
+      let cls = "turn-timer mine";
+      if (danger) cls += prefersReducedMotion ? " danger no-pulse" : " danger";
+      else if (warn) cls += " warn";
+      timerEl.className = cls;
+      timerEl.textContent = text;
+    } else {
+      const sec = Math.max(0, Math.ceil(remainingMs / 1000));
+      timerEl.className = "turn-timer opponent";
+      const curName = currentSlot(g)?.name ?? "Opponent";
+      timerEl.textContent = `${curName} has ${String(sec)}s`;
+    }
+
+    maybeAutoAdvance(g, remainingMs, mine);
+  }
+
+  function maybeAutoAdvance(
+    g: GameState,
+    remainingMs: number,
+    mine: boolean,
+  ): void {
+    if (!state.myUid) return;
+    if (state.isAnimatingRoll) return;
+    if (g.turnStartedAt === null) return;
+    const threshold = mine ? -CLOCK_SKEW_MS : -(NON_CURRENT_GRACE_MS + CLOCK_SKEW_MS);
+    if (remainingMs > threshold) return;
+    if (advanceAttemptKey === g.turnStartedAt) return;
+    advanceAttemptKey = g.turnStartedAt;
+    void advanceTurn({ code: g.code, byUid: state.myUid }).catch(
+      (err: unknown) => {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg === "NOT_YOUR_TURN" || msg === "TURN_NOT_EXPIRED") return;
+        setStatus(humanError(err), "loss");
+      },
+    );
+  }
+
+  const timerInterval = window.setInterval(tickTimer, 250);
+
   function maybeAnimateLocalRoll(g: GameState): void {
     if (state.isAnimatingRoll) return;
     if (!g.lastRoll || !g.lastRollId || g.lastRollId === shownRollId) return;
@@ -526,6 +611,7 @@ export function mount(root: HTMLElement): () => void {
     renderArena(g);
     renderKeepBar(g);
     renderActions(g);
+    tickTimer();
 
     if (!s.isAnimatingRoll && g.lastRollId && g.lastRollId !== resultRollId) {
       resultRollId = g.lastRollId;
@@ -537,11 +623,13 @@ export function mount(root: HTMLElement): () => void {
   root.addEventListener("click", onClick);
   const unsubscribe = subscribe(render);
   render(state);
+  tickTimer();
 
   return () => {
     unsubscribe();
     root.removeEventListener("click", onClick);
     if (resultTimer) clearTimeout(resultTimer);
+    window.clearInterval(timerInterval);
     if (stopWatch) stopWatch();
     hand.destroy();
     root.classList.remove("play");

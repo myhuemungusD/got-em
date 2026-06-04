@@ -245,24 +245,31 @@ export interface AdvanceTurnInput {
 }
 
 /**
- * Rotate `current` to the next slot and stamp the turn deadline. Only the
- * player whose turn it currently is may call this. Mode-specific cleanup
- * (craps point reset, ten banking, etc.) is NOT performed here — that ports
- * later with the play screen. This op is the substrate for Phase 2's turn
- * timer + reconnection work.
+ * Rotate `current` to the next slot and stamp the turn deadline. The current
+ * player may always advance; any seated player may advance once the
+ * server-recorded `turnDeadline` has lapsed — this is the substrate for the
+ * turn-timer auto-advance so a stalled table can't deadlock.
  *
  * Note: `turnDeadline` is a client-computed `Date.now() + duration`. Real
  * Firestore's `serverTimestamp()` sentinel cannot be used in arithmetic, so
  * we accept small clock-skew on the deadline.
  *
- * Throws stable strings: `ROOM_NOT_FOUND`, `NOT_IN_PROGRESS`, `NOT_YOUR_TURN`.
+ * Throws stable strings: `ROOM_NOT_FOUND`, `NOT_IN_PROGRESS`, `NOT_YOUR_TURN`,
+ * `TURN_NOT_EXPIRED` (a non-current player tried to advance before the
+ * deadline). Idempotency: if two clients race the auto-advance, the loser
+ * sees `NOT_YOUR_TURN`/`TURN_NOT_EXPIRED` because `current` and the deadline
+ * have already moved.
  */
 export async function advanceTurn(input: AdvanceTurnInput): Promise<void> {
   await updateGameTx(input.code, (g, commit) => {
     if (g.status !== "in_progress") throw new Error("NOT_IN_PROGRESS");
+    if (!g.playerUids.includes(input.byUid)) throw new Error("NOT_YOUR_TURN");
     const currentSlot = g.slots[g.current];
-    if (!currentSlot || currentSlot.uid !== input.byUid) {
-      throw new Error("NOT_YOUR_TURN");
+    const isCurrent = currentSlot?.uid === input.byUid;
+    if (!isCurrent) {
+      const expired =
+        g.turnDeadline !== null && nowTs() > g.turnDeadline;
+      if (!expired) throw new Error("TURN_NOT_EXPIRED");
     }
     const nextCurrent = (g.current + 1) % g.numSlots;
     const startedAt = nowTs();
