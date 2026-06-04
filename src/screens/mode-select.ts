@@ -48,7 +48,7 @@ function escHtml(s: string): string {
 const SCREEN_HTML = `
   <div class="topbar">
     <button class="icon-btn" type="button" data-action="back" aria-label="Back">‹</button>
-    <div class="topbar-title">New <span class="accent">Game</span></div>
+    <h1 class="topbar-title">New <span class="accent">Game</span></h1>
     <div style="width:40px"></div>
   </div>
   <div class="screen-body">

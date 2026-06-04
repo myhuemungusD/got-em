@@ -8,7 +8,7 @@ import { leaveRoom } from "../game-bridge";
 const LOBBY_HTML = `
   <div class="lobby-topbar">
     <button class="icon-btn" type="button" data-action="leave" aria-label="Leave">&lsaquo;</button>
-    <div class="lobby-topbar-title">Waiting <span class="accent">Room</span></div>
+    <h1 class="lobby-topbar-title">Waiting <span class="accent">Room</span></h1>
     <div style="width:40px"></div>
   </div>
   <div class="lobby-body">

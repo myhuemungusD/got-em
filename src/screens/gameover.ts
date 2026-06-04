@@ -7,12 +7,12 @@ import { rememberRoom, rememberChallengers } from "../recent";
 const STARTING_CHIPS = 100;
 
 const GAMEOVER_HTML = `
-  <div class="winner-trophy">🏆</div>
+  <div class="winner-trophy" aria-hidden="true">🏆</div>
   <div class="winner-label">Winner</div>
-  <div class="winner-name" id="winner-name">PLAYER</div>
+  <h1 class="winner-name" id="winner-name">PLAYER</h1>
   <div class="winner-streak"></div>
-  <div class="final-score" id="final-score"></div>
-  <div class="wager-result" id="wager-result" hidden></div>
+  <div class="final-score" id="final-score" aria-live="polite"></div>
+  <div class="wager-result" id="wager-result" aria-live="polite" hidden></div>
   <div class="gameover-actions">
     <button class="btn btn-primary" type="button" data-action="play-again">Play Again</button>
     <button class="btn btn-secondary" type="button" data-action="new-game">New Game</button>
@@ -84,7 +84,7 @@ function render(root: HTMLElement): void {
   if (!g) return;
 
   const winner = g.slots.find((s) => s.uid === g.winner);
-  const winnerNameEl = root.querySelector<HTMLDivElement>("#winner-name");
+  const winnerNameEl = root.querySelector<HTMLHeadingElement>("#winner-name");
   if (winnerNameEl) winnerNameEl.textContent = winner?.name ?? "PLAYER";
 
   const fs = root.querySelector<HTMLDivElement>("#final-score");

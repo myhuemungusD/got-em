@@ -1,4 +1,5 @@
 import "./styles/tokens.css";
+import "./styles/a11y.css";
 import "./styles/splash.css";
 import { startRouter } from "./router";
 import { installErrorBoundary } from "./error-boundary";
