@@ -1,6 +1,7 @@
 import { setState, state } from "../state";
 import { joinRoom, readGame } from "../firebase";
 import { watchRoom } from "../game-bridge";
+import { getSfx } from "../components";
 
 interface SplashRefs {
   nameInput: HTMLInputElement;
@@ -10,9 +11,11 @@ interface SplashRefs {
   newGameBtn: HTMLButtonElement;
   openJoinBtn: HTMLButtonElement;
   submitJoinBtn: HTMLButtonElement;
+  sfxBtn: HTMLButtonElement;
 }
 
 const SPLASH_HTML = `
+  <button class="sfx-toggle" type="button" data-action="toggle-sfx"></button>
   <h1 class="splash-logo">Street<br><span class="accent">Dice</span></h1>
   <div class="splash-slogan">For The Love of The Game</div>
   <div class="splash-subtitle">play anywhere · with anyone</div>
@@ -60,6 +63,22 @@ export function mount(root: HTMLElement): () => void {
     newGameBtn: root.querySelector<HTMLButtonElement>('[data-action="new-game"]')!,
     openJoinBtn: root.querySelector<HTMLButtonElement>('[data-action="open-join"]')!,
     submitJoinBtn: root.querySelector<HTMLButtonElement>('[data-action="submit-join"]')!,
+    sfxBtn: root.querySelector<HTMLButtonElement>('[data-action="toggle-sfx"]')!,
+  };
+
+  const renderSfxBtn = (): void => {
+    const muted = getSfx().isMuted();
+    refs.sfxBtn.textContent = muted ? "🔇" : "🔊";
+    refs.sfxBtn.setAttribute("aria-label", muted ? "Unmute sounds" : "Mute sounds");
+    refs.sfxBtn.setAttribute("aria-pressed", muted ? "true" : "false");
+  };
+  renderSfxBtn();
+
+  const onToggleSfx = (): void => {
+    const next = !getSfx().isMuted();
+    getSfx().setMuted(next);
+    renderSfxBtn();
+    if (!next) getSfx().play("tap");
   };
 
   refs.nameInput.value = state.myName;
@@ -175,6 +194,7 @@ export function mount(root: HTMLElement): () => void {
   refs.joinInput.addEventListener("input", onJoinInput);
   refs.joinInput.addEventListener("keydown", onJoinKey);
   refs.submitJoinBtn.addEventListener("click", onSubmitJoin);
+  refs.sfxBtn.addEventListener("click", onToggleSfx);
 
   return () => {
     refs.nameInput.removeEventListener("input", onName);
@@ -184,6 +204,7 @@ export function mount(root: HTMLElement): () => void {
     refs.joinInput.removeEventListener("input", onJoinInput);
     refs.joinInput.removeEventListener("keydown", onJoinKey);
     refs.submitJoinBtn.removeEventListener("click", onSubmitJoin);
+    refs.sfxBtn.removeEventListener("click", onToggleSfx);
     root.classList.remove("splash");
     root.innerHTML = "";
   };
