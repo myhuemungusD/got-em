@@ -188,4 +188,47 @@ describe("advanceTurn deadline-based auto-advance", () => {
       "NOT_YOUR_TURN",
     );
   });
+
+  it("resets craps point on timeout so the next player gets a fresh come-out", async () => {
+    const code = await makeInProgress3p();
+    // Force the current player into the point phase so a leak would be visible.
+    await updateGameTx(code, (_doc, commit) => {
+      commit({ craps: { phase: "point", point: 6 } });
+    });
+    const g = (await readGame(code)) as GameDoc;
+    vi.useFakeTimers();
+    vi.setSystemTime((g.turnDeadline as number) + 5);
+    await advanceTurn({ code, byUid: "u2" });
+    const after = (await readGame(code)) as GameDoc;
+    expect(after.craps).toEqual({ phase: "comeout", point: null });
+    expect(after.current).toBe(1);
+  });
+
+  it("resets ten turn state on timeout so the next player can't bank inherited dice", async () => {
+    const code = await makeInProgress3p();
+    // Switch room to ten mode and seed an in-progress mustChoose state.
+    await updateGameTx(code, (_doc, commit) => {
+      commit({
+        mode: "ten",
+        ten: {
+          turnScore: 200,
+          kept: [1, 5],
+          rolledThisStep: [1, 5, 2, 3, 4, 6],
+          mustChoose: true,
+        },
+      });
+    });
+    const g = (await readGame(code)) as GameDoc;
+    vi.useFakeTimers();
+    vi.setSystemTime((g.turnDeadline as number) + 5);
+    await advanceTurn({ code, byUid: "u2" });
+    const after = (await readGame(code)) as GameDoc;
+    expect(after.ten).toEqual({
+      turnScore: 0,
+      kept: [],
+      rolledThisStep: [],
+      mustChoose: false,
+    });
+    expect(after.current).toBe(1);
+  });
 });

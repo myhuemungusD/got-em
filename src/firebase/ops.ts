@@ -273,7 +273,26 @@ export async function advanceTurn(input: AdvanceTurnInput): Promise<void> {
     }
     const nextCurrent = (g.current + 1) % g.numSlots;
     const startedAt = nowTs();
+    // A timed-out player's mode-local turn state must NOT carry over to the
+    // next player. Mirror the end-of-turn resets in gameplay.ts:
+    //   - craps: clear point so the next player gets a fresh come-out
+    //   - ten:   clear turn score / kept / rolled / mustChoose
+    // clo/s456 keep `matchup.rolls` because rolls are keyed by uid (the
+    // timed-out player simply hasn't rolled this round; the round resolver
+    // handles that path on its own).
+    const modeReset: Partial<GameDoc> = {};
+    if (g.mode === "craps") {
+      modeReset.craps = { phase: "comeout", point: null };
+    } else if (g.mode === "ten") {
+      modeReset.ten = {
+        turnScore: 0,
+        kept: [],
+        rolledThisStep: [],
+        mustChoose: false,
+      };
+    }
     commit({
+      ...modeReset,
       current: nextCurrent,
       turnStartedAt: startedAt,
       turnDeadline: startedAt + g.turnDurationMs,
