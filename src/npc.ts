@@ -10,6 +10,7 @@
  * state update so the NPC reacts to turn changes.
  */
 import type { GameState } from "./state";
+import { state } from "./state";
 import {
   joinRoom,
   rollCraps,
@@ -63,6 +64,10 @@ export function hasActiveNpcs(): boolean {
   return activeNpcs.size > 0;
 }
 
+export function getActiveNpcUids(): string[] {
+  return Array.from(activeNpcs);
+}
+
 /**
  * Called from game-bridge on every doc update. If the current player is one
  * of our NPCs, schedule their action after a short delay so the game feels
@@ -75,6 +80,7 @@ export function maybeNpcTurn(g: GameState): void {
   }
 
   if (g.status !== "in_progress") return;
+  if (state.isAnimatingRoll) return;
 
   const slot = g.slots[g.current];
   if (!slot?.uid || !activeNpcs.has(slot.uid)) return;
@@ -85,7 +91,9 @@ export function maybeNpcTurn(g: GameState): void {
 
   pendingTimer = setTimeout(() => {
     pendingTimer = null;
-    void executeNpcTurn(code, uid, g).catch(() => undefined);
+    void executeNpcTurn(code, uid, g).catch((err: unknown) => {
+      console.warn("[npc] turn failed:", err instanceof Error ? err.message : err);
+    });
   }, delay);
 }
 
@@ -137,10 +145,12 @@ async function npcTenAction(
     return;
   }
 
+  const r = Math.random();
   const shouldBank =
     turnScoreAfterKeep >= 3000 ||
-    (turnScoreAfterKeep >= 1500 && Math.random() > 0.3) ||
-    (turnScoreAfterKeep >= 1000 && Math.random() > 0.6);
+    (turnScoreAfterKeep >= 1500 && r > 0.3) ||
+    (turnScoreAfterKeep >= 1000 && r > 0.6) ||
+    (onBoard && turnScoreAfterKeep >= 300 && r > 0.75);
 
   if (shouldBank) {
     await bankTen({ code, byUid: uid, keep });

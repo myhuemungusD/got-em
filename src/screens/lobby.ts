@@ -4,7 +4,7 @@ import type { GameState } from "../state";
 import { joinRoom, startGame, leaveGame, lockWagers, refundWagers } from "../firebase";
 import { openInviteModal, getSfx } from "../components";
 import { leaveRoom } from "../game-bridge";
-import { addNpc, isNpc } from "../npc";
+import { addNpc, isNpc, getActiveNpcUids } from "../npc";
 
 const LOBBY_HTML = `
   <div class="lobby-topbar">
@@ -180,6 +180,12 @@ export function mount(root: HTMLElement): () => void {
     busy = true;
     setStatus("");
     try {
+      const npcUids = getActiveNpcUids();
+      if (npcUids.length > 0) {
+        await Promise.allSettled(
+          npcUids.map((npcUid) => leaveGame({ code: g.code, uid: npcUid })),
+        );
+      }
       if (state.myUid) {
         await leaveGame({ code: g.code, uid: state.myUid });
       }

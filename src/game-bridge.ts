@@ -106,6 +106,7 @@ export function watchRoom(code: string, hooks: WatchRoomHooks = {}): () => void 
     activeUnsub();
     activeUnsub = null;
   }
+  clearNpcs();
 
   const unsub = subscribeGame(code, (doc) => {
     handleDoc(doc, hooks).catch((err: unknown) => {
