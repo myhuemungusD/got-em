@@ -14,6 +14,7 @@ import { createHand, renderDice, clearDice, haptic, getSfx } from "../components
 import type { Hand } from "../components";
 import { watchRoom, isMyTurn, currentSlot, leaveRoom } from "../game-bridge";
 import { ten10kScoreCombo } from "../scoring/farkle";
+import { isNpc } from "../npc";
 
 interface ModeMeta {
   short: string;
@@ -342,7 +343,8 @@ export function mount(root: HTMLElement): () => void {
       dot.className = "player-dot";
       const name = document.createElement("span");
       name.className = "player-name";
-      name.textContent = s.name + (isMe ? " (you)" : "");
+      const suffix = isMe ? " (you)" : isNpc(s.uid) ? " (CPU)" : "";
+      name.textContent = s.name + suffix;
       nameRow.append(dot, name);
 
       chip.append(nameRow, scoreBlock(g, s), detailLine(g, s));

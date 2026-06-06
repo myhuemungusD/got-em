@@ -4,6 +4,7 @@ import type { GameState } from "../state";
 import { joinRoom, startGame, leaveGame, lockWagers, refundWagers } from "../firebase";
 import { openInviteModal, getSfx } from "../components";
 import { leaveRoom } from "../game-bridge";
+import { addNpc, isNpc, getActiveNpcUids } from "../npc";
 
 const LOBBY_HTML = `
   <div class="lobby-topbar">
@@ -179,6 +180,12 @@ export function mount(root: HTMLElement): () => void {
     busy = true;
     setStatus("");
     try {
+      const npcUids = getActiveNpcUids();
+      if (npcUids.length > 0) {
+        await Promise.allSettled(
+          npcUids.map((npcUid) => leaveGame({ code: g.code, uid: npcUid })),
+        );
+      }
       if (state.myUid) {
         await leaveGame({ code: g.code, uid: state.myUid });
       }
@@ -255,8 +262,29 @@ export function mount(root: HTMLElement): () => void {
     })();
   };
 
+  const addCpu = async (slotIdx: number): Promise<void> => {
+    const g = state.game;
+    if (!g || busy) return;
+    busy = true;
+    setStatus("");
+    try {
+      await addNpc(g.code, slotIdx);
+      getSfx().play("tap");
+    } catch (err) {
+      setStatus(humanError(err));
+    } finally {
+      busy = false;
+    }
+  };
+
   const onSlotsClick = (e: MouseEvent): void => {
     const target = e.target as HTMLElement;
+    const cpuBtn = target.closest<HTMLButtonElement>('[data-action="add-cpu"]');
+    if (cpuBtn) {
+      const idx = Number(cpuBtn.dataset["slot"]);
+      if (Number.isInteger(idx)) void addCpu(idx);
+      return;
+    }
     const btn = target.closest<HTMLButtonElement>('[data-action="claim"]');
     if (!btn) return;
     const idx = Number(btn.dataset["slot"]);
@@ -269,22 +297,30 @@ export function mount(root: HTMLElement): () => void {
 
     const myUid = state.myUid;
     const alreadyIn = myUid !== null && g.playerUids.includes(myUid);
+    const isHost = myUid !== null && myUid === g.hostUid;
 
     slotsEl.innerHTML = g.slots
       .map((s, i) => {
         const taken = s.uid !== null;
         const mine = myUid !== null && s.uid === myUid;
-        const isHost = s.uid !== null && s.uid === g.hostUid;
-        const cls = `slot-row${taken ? " taken" : ""}${mine ? " mine" : ""}`;
-        const action =
-          !taken && !alreadyIn
-            ? `<button class="btn-claim" type="button" data-action="claim" data-slot="${i}">Take seat</button>`
-            : "";
+        const isHostSlot = s.uid !== null && s.uid === g.hostUid;
+        const npc = isNpc(s.uid);
+        const cls = `slot-row${taken ? " taken" : ""}${mine ? " mine" : ""}${npc ? " npc" : ""}`;
+        let action = "";
+        if (!taken) {
+          if (!alreadyIn) {
+            action = `<button class="btn-claim" type="button" data-action="claim" data-slot="${i}">Take seat</button>`;
+          }
+          if (isHost) {
+            action += `<button class="btn-claim btn-cpu" type="button" data-action="add-cpu" data-slot="${i}">+ CPU</button>`;
+          }
+        }
+        const nameLabel = npc ? `${escHtml(s.name)} <span class="slot-cpu-tag">CPU</span>` : (taken ? escHtml(s.name) : "Open");
         return `<div class="${cls}">
           <div class="slot-num">${i + 1}</div>
           <div class="slot-info">
-            <div class="slot-name">${taken ? escHtml(s.name) : "Open"}</div>
-            <div class="slot-meta">${slotMeta(taken, mine, isHost)}</div>
+            <div class="slot-name">${nameLabel}</div>
+            <div class="slot-meta">${slotMeta(taken, mine, isHostSlot)}</div>
           </div>
           ${action}
         </div>`;
@@ -294,8 +330,6 @@ export function mount(root: HTMLElement): () => void {
     const filled = g.slots.filter((s) => s.uid !== null).length;
     const total = g.slots.length;
     const need = total - filled;
-
-    const isHost = myUid !== null && myUid === g.hostUid;
 
     // Wager controls: visible to host while the room is waiting.
     if (isHost) {
