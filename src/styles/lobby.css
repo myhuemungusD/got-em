@@ -330,3 +330,38 @@
   letter-spacing: 0.05em;
   min-height: 16px;
 }
+
+/* ---- NPC / CPU slots ---- */
+.btn-cpu {
+  background: var(--bg-elev-1);
+  border-color: var(--text-mute);
+  color: var(--text-mute);
+  font-size: 11px;
+  padding: 4px 10px;
+  margin-left: 4px;
+}
+
+.btn-cpu:hover,
+.btn-cpu:focus-visible {
+  border-color: var(--orange);
+  color: var(--orange);
+}
+
+.slot-row.npc .slot-num {
+  background: #1a1a2e;
+  border-color: #334;
+  color: #889;
+}
+
+.slot-cpu-tag {
+  font-family: var(--font-display);
+  font-size: 9px;
+  letter-spacing: 0.15em;
+  color: var(--text-mute);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 1px 5px;
+  margin-left: 6px;
+  vertical-align: middle;
+}

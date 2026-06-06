@@ -12,6 +12,7 @@
 import { setState, state } from "./state";
 import { subscribeGame, settlePot } from "./firebase";
 import type { GameDoc, GameState, Slot, Unsubscribe } from "./firebase";
+import { maybeNpcTurn, clearNpcs } from "./npc";
 
 export interface WatchRoomHooks {
   animateRoll?: (values: number[]) => Promise<void>;
@@ -79,6 +80,7 @@ async function handleDoc(doc: GameDoc | undefined, hooks: WatchRoomHooks): Promi
   setState(patch);
 
   maybeAutoSettle(doc);
+  maybeNpcTurn(doc);
 }
 
 /**
@@ -131,6 +133,7 @@ export function stopWatching(): void {
     activeUnsub();
     activeUnsub = null;
   }
+  clearNpcs();
   setState({ game: null, currentRoom: null, lastSeenRollId: null });
 }
 
