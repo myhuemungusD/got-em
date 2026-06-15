@@ -3,7 +3,6 @@ import {
   advanceTurn,
   createRoom,
   joinRoom,
-  leaveGame,
   readGame,
   startGame,
   updateGameTx,
@@ -118,8 +117,6 @@ describe("advanceTurn", () => {
     expect(after.lastResult).toEqual(before.lastResult);
     expect(after.lastRollId).toEqual(before.lastRollId);
     expect(after.lastRolledBy).toEqual(before.lastRolledBy);
-    // Unused but referenced to avoid lint complaints if leaveGame import drifts.
-    void leaveGame;
   });
 });
 

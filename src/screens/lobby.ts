@@ -4,7 +4,7 @@ import type { GameState } from "../state";
 import { joinRoom, startGame, leaveGame, lockWagers, refundWagers } from "../firebase";
 import { openInviteModal, getSfx } from "../components";
 import { leaveRoom } from "../game-bridge";
-import { addNpc, isNpc, getActiveNpcUids } from "../npc";
+import { addNpc, removeNpc, isNpc, getActiveNpcUids } from "../npc";
 
 const LOBBY_HTML = `
   <div class="lobby-topbar">
@@ -277,8 +277,29 @@ export function mount(root: HTMLElement): () => void {
     }
   };
 
+  const kickCpu = async (uid: string): Promise<void> => {
+    const g = state.game;
+    if (!g || busy) return;
+    busy = true;
+    setStatus("");
+    try {
+      await removeNpc(g.code, uid);
+      getSfx().play("tap");
+    } catch (err) {
+      setStatus(humanError(err));
+    } finally {
+      busy = false;
+    }
+  };
+
   const onSlotsClick = (e: MouseEvent): void => {
     const target = e.target as HTMLElement;
+    const kickBtn = target.closest<HTMLButtonElement>('[data-action="kick-cpu"]');
+    if (kickBtn) {
+      const uid = kickBtn.dataset["uid"];
+      if (uid) void kickCpu(uid);
+      return;
+    }
     const cpuBtn = target.closest<HTMLButtonElement>('[data-action="add-cpu"]');
     if (cpuBtn) {
       const idx = Number(cpuBtn.dataset["slot"]);
@@ -314,6 +335,9 @@ export function mount(root: HTMLElement): () => void {
           if (isHost) {
             action += `<button class="btn-claim btn-cpu" type="button" data-action="add-cpu" data-slot="${i}">+ CPU</button>`;
           }
+        }
+        if (npc && isHost && g.status === "waiting") {
+          action = `<button class="btn-claim btn-kick-cpu" type="button" data-action="kick-cpu" data-uid="${escHtml(s.uid!)}" aria-label="Remove CPU">&times;</button>`;
         }
         const nameLabel = npc ? `${escHtml(s.name)} <span class="slot-cpu-tag">CPU</span>` : (taken ? escHtml(s.name) : "Open");
         return `<div class="${cls}">

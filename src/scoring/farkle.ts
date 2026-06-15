@@ -78,3 +78,12 @@ export function ten10kScoreCombo(values: readonly number[]): FarkleScore {
 
   return { score, used };
 }
+
+export function scoringIndices(values: readonly number[]): number[] {
+  const { used } = ten10kScoreCombo(values);
+  const out: number[] = [];
+  used.forEach((isUsed, i) => {
+    if (isUsed) out.push(i);
+  });
+  return out;
+}

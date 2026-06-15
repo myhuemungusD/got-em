@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://got-em.vercel.app/sitemap.xml

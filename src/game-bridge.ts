@@ -80,7 +80,7 @@ async function handleDoc(doc: GameDoc | undefined, hooks: WatchRoomHooks): Promi
   setState(patch);
 
   maybeAutoSettle(doc);
-  maybeNpcTurn(doc);
+  if (state.myUid === doc.hostUid) maybeNpcTurn(doc);
 }
 
 /**
@@ -145,7 +145,7 @@ export function leaveRoom(): Promise<void> {
 }
 
 export function isMyTurn(g: GameState | null, myUid: string | null): boolean {
-  return g ? g.slots[g.current]?.uid === myUid : false;
+  return !!myUid && g != null && g.slots[g.current]?.uid === myUid;
 }
 
 export function currentSlot(g: GameState | null): Slot | null {

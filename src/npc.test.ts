@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { isNpc, addNpc, clearNpcs, maybeNpcTurn, hasActiveNpcs, getActiveNpcUids } from "./npc";
+import { isNpc, addNpc, removeNpc, clearNpcs, maybeNpcTurn, hasActiveNpcs, getActiveNpcUids } from "./npc";
 import { createRoom, readGame } from "./firebase";
 import { __resetMock } from "./firebase/mock";
 import { setDieSource, resetDieSource } from "./scoring/dice";
@@ -85,6 +85,28 @@ describe("clearNpcs", () => {
 
     clearNpcs();
     expect(hasActiveNpcs()).toBe(false);
+  });
+});
+
+describe("removeNpc", () => {
+  it("removes a single NPC from the room and tracking set", async () => {
+    const code = await createRoom({
+      mode: "craps",
+      numPlayers: 4,
+      hostUid: "host",
+      hostName: "Host",
+    });
+
+    const uid1 = await addNpc(code, 1);
+    const uid2 = await addNpc(code, 2);
+    expect(getActiveNpcUids()).toHaveLength(2);
+
+    await removeNpc(code, uid1);
+    expect(getActiveNpcUids()).toEqual([uid2]);
+
+    const game = await readGame(code);
+    expect(game?.slots[1]?.uid).toBeNull();
+    expect(game?.slots[2]?.uid).toBe(uid2);
   });
 });
 
@@ -182,6 +204,95 @@ describe("maybeNpcTurn", () => {
 
     const afterNpc = await readGame(code);
     expect(afterNpc?.lastRolledBy).toBe(npcUid);
+
+    vi.useRealTimers();
+  });
+
+  it("schedules a clo roll when it is the NPC's turn", async () => {
+    vi.useFakeTimers();
+
+    const code = await createRoom({
+      mode: "clo",
+      numPlayers: 2,
+      hostUid: "host",
+      hostName: "Host",
+    });
+    const npcUid = await addNpc(code, 1);
+
+    const started = await readGame(code);
+    expect(started?.status).toBe("in_progress");
+    expect(started?.current).toBe(0);
+
+    // Host rolls a scoring set so the turn moves on to the NPC.
+    const hostDice = [4, 5, 6];
+    let hostIdx = 0;
+    setDieSource(() => hostDice[hostIdx++]!);
+    const { rollClo } = await import("./firebase");
+    await rollClo({ code, byUid: "host" });
+
+    const afterHostRoll = await readGame(code);
+    expect(afterHostRoll?.current).toBe(1);
+    expect(afterHostRoll?.slots[1]?.uid).toBe(npcUid);
+
+    const npcDice = [1, 1, 1];
+    let npcIdx = 0;
+    setDieSource(() => npcDice[npcIdx++]!);
+    maybeNpcTurn(afterHostRoll!);
+
+    await vi.advanceTimersByTimeAsync(2500);
+
+    const afterNpc = await readGame(code);
+    expect(afterNpc?.lastRolledBy).toBe(npcUid);
+
+    vi.useRealTimers();
+  });
+
+  it("keeps scoring dice and banks at a high turn score in ten mode", async () => {
+    vi.useFakeTimers();
+
+    const code = await createRoom({
+      mode: "ten",
+      numPlayers: 2,
+      hostUid: "host",
+      hostName: "Host",
+    });
+    const npcUid = await addNpc(code, 1);
+
+    const started = await readGame(code);
+    expect(started?.status).toBe("in_progress");
+    expect(started?.current).toBe(0);
+
+    // Host farkles (no 1s/5s, no triples) so the turn advances to the NPC.
+    const hostDice = [2, 2, 3, 3, 4, 6];
+    let hostIdx = 0;
+    setDieSource(() => hostDice[hostIdx++]!);
+    const { rollTen } = await import("./firebase");
+    await rollTen({ code, byUid: "host" });
+
+    const afterHostRoll = await readGame(code);
+    expect(afterHostRoll?.current).toBe(1);
+    expect(afterHostRoll?.slots[1]?.uid).toBe(npcUid);
+
+    // NPC's first action: it has no pending choice, so it rolls. Six 1s scores
+    // 8000 and flags mustChoose.
+    let npcIdx = 0;
+    const sixOnes = [1, 1, 1, 1, 1, 1];
+    setDieSource(() => sixOnes[npcIdx++]!);
+    maybeNpcTurn(afterHostRoll!);
+    await vi.advanceTimersByTimeAsync(2500);
+
+    const afterRoll = await readGame(code);
+    expect(afterRoll?.ten?.mustChoose).toBe(true);
+    expect(afterRoll?.lastRolledBy).toBe(npcUid);
+
+    // NPC's second action: keep all scoring dice and bank (8000 >= 3000).
+    maybeNpcTurn(afterRoll!);
+    await vi.advanceTimersByTimeAsync(2500);
+
+    const afterBank = await readGame(code);
+    expect(afterBank?.slots[1]?.onBoard).toBe(true);
+    expect(afterBank?.slots[1]?.score).toBe(8000);
+    expect(afterBank?.ten?.mustChoose).toBe(false);
 
     vi.useRealTimers();
   });

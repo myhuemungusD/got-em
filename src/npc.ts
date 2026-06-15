@@ -13,13 +13,14 @@ import type { GameState } from "./state";
 import { state } from "./state";
 import {
   joinRoom,
+  leaveGame,
   rollCraps,
   rollClo,
   rollTen,
   bankTen,
   rollAgainTen,
 } from "./firebase";
-import { ten10kScoreCombo } from "./scoring/farkle";
+import { ten10kScoreCombo, scoringIndices } from "./scoring/farkle";
 
 const NPC_UID_PREFIX = "npc-";
 
@@ -46,9 +47,19 @@ function nextNpcName(): string {
 export async function addNpc(code: string, slotIdx: number): Promise<string> {
   const uid = genNpcUid();
   const name = nextNpcName();
-  await joinRoom({ code, slotIdx, uid, name });
   activeNpcs.add(uid);
+  try {
+    await joinRoom({ code, slotIdx, uid, name });
+  } catch (err) {
+    activeNpcs.delete(uid);
+    throw err;
+  }
   return uid;
+}
+
+export async function removeNpc(code: string, uid: string): Promise<void> {
+  activeNpcs.delete(uid);
+  await leaveGame({ code, uid });
 }
 
 export function clearNpcs(): void {
@@ -128,13 +139,19 @@ async function npcTenAction(
   }
 
   const rolled = t.rolledThisStep;
-  const { score, used } = ten10kScoreCombo(rolled);
-  const keep: number[] = [];
-  used.forEach((u, i) => {
-    if (u) keep.push(i);
-  });
+  const { score } = ten10kScoreCombo(rolled);
+  const keep = scoringIndices(rolled);
 
-  if (keep.length === 0) return;
+  if (keep.length === 0) {
+    // Unreachable in practice: mustChoose is only set when maxScore > 0, so
+    // there is always at least one scoring die. Warn so a violation is visible
+    // rather than silently stalling the table until the 30s turn timer.
+    console.warn(
+      "[npc] ten action: no scoring dice in mustChoose state",
+      rolled,
+    );
+    return;
+  }
 
   const turnScoreAfterKeep = t.turnScore + score;
   const slot = g.slots[g.current];

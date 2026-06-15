@@ -1,0 +1,62 @@
+name: Bug report
+description: Report a problem with Got Em — Street Dice
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for taking the time to file a bug! Please fill out the fields below.
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: A clear and concise description of the bug.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: How can we reproduce it?
+      placeholder: |
+        1. Go to '...'
+        2. Roll '...'
+        3. See error
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected vs actual
+      description: What did you expect to happen, and what actually happened?
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Game mode affected
+      options:
+        - Craps
+        - C-Lo
+        - 4-5-6
+        - "10,000"
+        - Lobby / invite
+        - Other / not sure
+    validations:
+      required: true
+  - type: dropdown
+    id: opponent
+    attributes:
+      label: Game type
+      options:
+        - Human vs human
+        - Human vs computer (NPC)
+        - Not sure
+    validations:
+      required: false
+  - type: input
+    id: env
+    attributes:
+      label: Browser / device
+      placeholder: "e.g. Chrome 124 on Pixel 8, Safari on iPhone 15"
+    validations:
+      required: false

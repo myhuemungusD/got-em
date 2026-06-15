@@ -118,7 +118,7 @@ describe("isMyTurn / currentSlot", () => {
   it("isMyTurn handles null game and null uid", () => {
     expect(isMyTurn(null, "u1")).toBe(false);
     const empty = makeDoc({ slots: [makeSlot(null, ""), makeSlot("u2", "Blaze")], current: 0 });
-    expect(isMyTurn(empty, null)).toBe(true);
+    expect(isMyTurn(empty, null)).toBe(false);
     expect(isMyTurn(empty, "u2")).toBe(false);
   });
 

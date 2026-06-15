@@ -1,0 +1,6 @@
+# Default owner for everything in the repo.
+* @myhuemungusD
+
+# Security-critical surfaces — always request the maintainer.
+/firestore.rules   @myhuemungusD
+/src/firebase/     @myhuemungusD
