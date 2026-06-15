@@ -33,12 +33,14 @@
     "preview": "vite preview",
     "test": "vitest run --passWithNoTests",
     "test:coverage": "vitest run --passWithNoTests --coverage",
+    "test:rules": "firebase emulators:exec --only firestore -- npx vitest run src/firebase/rules.test.ts",
     "test:watch": "vitest --passWithNoTests",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --max-warnings=0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@firebase/rules-unit-testing": "^5.0.1",
     "@types/node": "^25.9.1",
     "@vitest/coverage-v8": "^4.1.8",
     "eslint": "^10.4.1",
