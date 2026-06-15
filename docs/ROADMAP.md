@@ -34,11 +34,11 @@ reconciliation, auth-gated reads, and a rules test harness — all shipped.
 - **Privacy policy** — DONE (`public/privacy.html`, linked from splash footer).
 - **Content-rating disclaimer** — DONE. "Simulated dice — no real-money wagering"
   shown on splash screen and in the lobby wager section.
-- **Manifest screenshots + a designed icon** — TODO. Store listings require
-  `screenshots` in the manifest and a properly designed (not placeholder) icon
-  set.
-- **Play Store wrap** — TODO. Trusted Web Activity via Bubblewrap, plus
-  `/.well-known/assetlinks.json` for Digital Asset Links.
+- **Manifest screenshots + a designed icon** — DONE. 1024/512/192 designed
+  PNGs + maskable variant, 4 portrait screenshots in manifest, feature graphic.
+- **Play Store wrap** — scaffolded. TWA config (`twa/twa-values.json`),
+  Bubblewrap setup scripts, and `assetlinks.template.json` ready. Needs signing
+  key SHA-256 fingerprint to finalize `/.well-known/assetlinks.json`.
 
 ---
 
