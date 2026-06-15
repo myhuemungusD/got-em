@@ -13,7 +13,7 @@ import {
 import { createHand, renderDice, clearDice, haptic, getSfx } from "../components";
 import type { Hand } from "../components";
 import { watchRoom, isMyTurn, currentSlot, leaveRoom } from "../game-bridge";
-import { ten10kScoreCombo } from "../scoring/farkle";
+import { ten10kScoreCombo, scoringIndices } from "../scoring/farkle";
 import { isNpc } from "../npc";
 
 interface ModeMeta {
@@ -70,15 +70,6 @@ const PLAY_HTML = `
 
 function rolledThisStep(g: GameState): number[] {
   return g.ten?.rolledThisStep ?? [];
-}
-
-function scoringIndices(values: readonly number[]): number[] {
-  const { used } = ten10kScoreCombo(values);
-  const out: number[] = [];
-  used.forEach((isUsed, i) => {
-    if (isUsed) out.push(i);
-  });
-  return out;
 }
 
 function resultKind(g: GameState): string {

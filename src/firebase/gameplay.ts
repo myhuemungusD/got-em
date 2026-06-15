@@ -270,6 +270,7 @@ export async function rollClo(input: RollInput): Promise<void> {
       const firstTiedSlotIdx = g.slots.findIndex(
         (s) => s.uid !== null && tiedUids.has(s.uid),
       );
+      if (firstTiedSlotIdx < 0) throw new Error("TIE_RESOLVE_FAILED");
       commit({
         ...meta,
         matchup: { rolls: matchupRolls },

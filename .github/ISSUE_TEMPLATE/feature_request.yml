@@ -1,0 +1,40 @@
+name: Feature request
+description: Suggest an idea for Got Em — Street Dice
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Heads up — the project scope is intentionally locked.** Please read
+        [claude.md](https://github.com/myhuemungusD/got-em/blob/main/claude.md) first.
+        We will **not** add a UI framework, a server / Cloud Functions, or user
+        accounts, and the game set (Craps, C-Lo, 4-5-6, 10,000) + invites is fixed.
+        Ideas that fit within those constraints are very welcome.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / motivation
+      description: What problem does this solve? What's the use case?
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: Describe what you'd like to happen.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Any alternative approaches you've thought about.
+    validations:
+      required: false
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope check
+      options:
+        - label: This does not require a UI framework, a backend/Cloud Functions, or user accounts.
+          required: true
