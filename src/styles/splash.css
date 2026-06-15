@@ -192,3 +192,18 @@
   gap: 6px;
   position: relative;
 }
+
+.privacy-link {
+  margin-top: 12px;
+  font-size: 11px;
+  color: var(--text-dim);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.privacy-link:hover,
+.privacy-link:focus-visible {
+  color: var(--text-mute);
+}
