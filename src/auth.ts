@@ -45,7 +45,11 @@ function persistUid(uid: string): void {
 export async function ensureAuth(): Promise<string> {
   if (!TEST_MODE) {
     const { signInAnon } = await import("./firebase/real");
-    return signInAnon();
+    try {
+      return await signInAnon();
+    } catch {
+      throw new Error("AUTH_FAILED");
+    }
   }
 
   if (memoryUid) return Promise.resolve(memoryUid);
