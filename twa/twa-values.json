@@ -1,0 +1,17 @@
+{
+  "packageId": "com.designmainline.gotemstreetdice",
+  "host": "got-em.vercel.app",
+  "name": "Got Em \u2014 Street Dice",
+  "launcherName": "Got Em",
+  "display": "standalone",
+  "themeColor": "#ff6b00",
+  "navigationColor": "#0a0a0a",
+  "navigationColorDark": "#0a0a0a",
+  "backgroundColor": "#0a0a0a",
+  "enableNotifications": false,
+  "startUrl": "/",
+  "iconUrl": "https://got-em.vercel.app/icons/icon-512.png",
+  "maskableIconUrl": "https://got-em.vercel.app/icons/icon-maskable-512.png",
+  "webManifestUrl": "https://got-em.vercel.app/manifest.webmanifest",
+  "_note": "Reference values for Bubblewrap prompts. Confirm the final production host before generating the Android project."
+}
