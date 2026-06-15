@@ -31,21 +31,22 @@ reconciliation, auth-gated reads, and a rules test harness — all shipped.
 
 ## P2 — PWA / store readiness
 
-- **Privacy policy** — being shipped in the current phase.
+- **Privacy policy** — DONE (`public/privacy.html`, linked from splash footer).
+- **Content-rating disclaimer** — DONE. "Simulated dice — no real-money wagering"
+  shown on splash screen and in the lobby wager section.
 - **Manifest screenshots + a designed icon** — TODO. Store listings require
   `screenshots` in the manifest and a properly designed (not placeholder) icon
   set.
 - **Play Store wrap** — TODO. Trusted Web Activity via Bubblewrap, plus
   `/.well-known/assetlinks.json` for Digital Asset Links.
-- **Content-rating note** — TODO. Label the app clearly as **simulated dice
-  with no real-money wagering** (chips are virtual) in the listing and in-app.
 
 ---
 
 ## P3 — Polish
 
-- **In-app service-worker update prompt** — being shipped in the current phase.
-- **`robots.txt` + `sitemap`** — being shipped in the current phase
-  (`robots.txt` landed; `sitemap.xml` added).
-- **Coverage reporting in CI** — being shipped in the current phase
-  (`test:coverage` script + CI artifact upload added).
+- **In-app service-worker update prompt** — DONE (toast with SKIP_WAITING flow).
+- **`robots.txt` + `sitemap`** — DONE (`robots.txt` + `sitemap.xml` shipped).
+- **Coverage reporting in CI** — DONE (`test:coverage` script + CI artifact).
+- **Firebase rules test harness** — scaffolded (`firebase.json` + emulator
+  config + `rules.test.ts` with critical test cases). Requires Firebase
+  emulator to run locally/in CI.

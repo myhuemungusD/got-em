@@ -193,6 +193,14 @@
   position: relative;
 }
 
+.splash-disclaimer {
+  font-size: 10px;
+  color: var(--text-dim);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-top: 4px;
+}
+
 .privacy-link {
   margin-top: 12px;
   font-size: 11px;

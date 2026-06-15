@@ -331,6 +331,13 @@
   min-height: 16px;
 }
 
+.wager-disclaimer {
+  font-size: 10px;
+  color: var(--text-dim);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
 /* ---- NPC / CPU slots ---- */
 .btn-cpu {
   background: var(--bg-elev-1);

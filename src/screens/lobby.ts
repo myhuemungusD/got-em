@@ -38,6 +38,7 @@ const LOBBY_HTML = `
         <button class="btn btn-ghost" type="button" data-action="refund-wager" id="wager-refund" hidden>Refund Pot</button>
       </div>
       <div class="wager-state" id="wager-state"></div>
+      <div class="wager-disclaimer">Virtual chips only — no real money</div>
     </div>
     <div class="lobby-waiting" id="lobby-waiting"></div>
     <div class="lobby-status" id="lobby-status" role="status" aria-live="polite"></div>
@@ -332,7 +333,8 @@ export function mount(root: HTMLElement): () => void {
           if (!alreadyIn) {
             action = `<button class="btn-claim" type="button" data-action="claim" data-slot="${i}">Take seat</button>`;
           }
-          if (isHost) {
+          const wagerLocked = g.wager !== null && !g.wager.settled;
+          if (isHost && !wagerLocked) {
             action += `<button class="btn-claim btn-cpu" type="button" data-action="add-cpu" data-slot="${i}">+ CPU</button>`;
           }
         }
