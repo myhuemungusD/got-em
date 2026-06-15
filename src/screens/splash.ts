@@ -39,6 +39,7 @@ const SPLASH_HTML = `
   </div>
   <div class="splash-status" id="splash-status" role="status" aria-live="polite"></div>
   <div class="recent-section" id="recent-section"></div>
+  <a href="/privacy.html" class="privacy-link" target="_blank" rel="noopener">Privacy</a>
 `;
 
 function humanError(err: unknown): string {
