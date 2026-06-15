@@ -2,24 +2,175 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     match /games/{code} {
-      // Read is public — joiner needs to read the room before joining.
-      allow read: if true;
 
-      // createRoom: any authenticated user may create a new game doc.
-      allow create: if request.auth != null;
+      // ── Helper functions ──────────────────────────────────────────
 
-      // update: the acting user must already be a seated player or host,
-      // OR be joining the game (their uid appears in the incoming playerUids
-      // but not yet in the existing doc). This blocks arbitrary overwrites
-      // by authenticated users who are not part of the game.
-      allow update: if request.auth != null && (
-        request.auth.uid in resource.data.playerUids ||
-        request.auth.uid == resource.data.hostUid ||
-        request.auth.uid in request.resource.data.playerUids
-      );
+      function authUid() {
+        return request.auth.uid;
+      }
 
-      // Games are never deleted — only transitioned to "finished".
-      allow delete: if false;
+      function isNpcUid(uid) {
+        return uid is string && uid.size() >= 4 && uid[0:4] == 'npc-';
+      }
+
+      function isHost() {
+        return authUid() == resource.data.hostUid;
+      }
+
+      function isParticipant() {
+        return authUid() in resource.data.playerUids;
+      }
+
+      function isIncomingParticipant() {
+        return authUid() in request.resource.data.playerUids;
+      }
+
+      function cur() {
+        return resource.data;
+      }
+
+      function inc() {
+        return request.resource.data;
+      }
+
+      function unchanged(field) {
+        return inc()[field] == cur()[field];
+      }
+
+      function validMode(m) {
+        return m in ['craps', 'clo', 's456', 'ten'];
+      }
+
+      function validStatus(s) {
+        return s in ['waiting', 'in_progress', 'finished'];
+      }
+
+      function scoreCap(mode) {
+        return mode == 'craps' ? 3
+             : mode == 'ten'   ? 10000
+             : 1;
+      }
+
+      // Scores within mode cap (unrolled for max 6 slots).
+      function scoresWithinCap() {
+        let cap = scoreCap(inc().mode);
+        let slots = inc().slots;
+        return slots.size() <= 6
+            && (slots.size() < 1 || slots[0].score <= cap)
+            && (slots.size() < 2 || slots[1].score <= cap)
+            && (slots.size() < 3 || slots[2].score <= cap)
+            && (slots.size() < 4 || slots[3].score <= cap)
+            && (slots.size() < 5 || slots[4].score <= cap)
+            && (slots.size() < 6 || slots[5].score <= cap);
+      }
+
+      function scoresNonNegative() {
+        let slots = inc().slots;
+        return slots.size() <= 6
+            && (slots.size() < 1 || slots[0].score >= 0)
+            && (slots.size() < 2 || slots[1].score >= 0)
+            && (slots.size() < 3 || slots[2].score >= 0)
+            && (slots.size() < 4 || slots[3].score >= 0)
+            && (slots.size() < 5 || slots[4].score >= 0)
+            && (slots.size() < 6 || slots[5].score >= 0);
+      }
+
+      // At most one slot's score may change per write.
+      function atMostOneScoreChanged() {
+        let old = cur().slots;
+        let nw = inc().slots;
+        let d0 = (old.size() >= 1 && nw.size() >= 1 && old[0].score != nw[0].score) ? 1 : 0;
+        let d1 = (old.size() >= 2 && nw.size() >= 2 && old[1].score != nw[1].score) ? 1 : 0;
+        let d2 = (old.size() >= 3 && nw.size() >= 3 && old[2].score != nw[2].score) ? 1 : 0;
+        let d3 = (old.size() >= 4 && nw.size() >= 4 && old[3].score != nw[3].score) ? 1 : 0;
+        let d4 = (old.size() >= 5 && nw.size() >= 5 && old[4].score != nw[4].score) ? 1 : 0;
+        let d5 = (old.size() >= 6 && nw.size() >= 6 && old[5].score != nw[5].score) ? 1 : 0;
+        return (d0 + d1 + d2 + d3 + d4 + d5) <= 1;
+      }
+
+      // The caller may act for the current player if they ARE that
+      // player, or they are the host and the seat holds an NPC uid.
+      function canActForCurrentPlayer() {
+        let seatUid = cur().slots[cur().current].uid;
+        return seatUid == authUid()
+            || (isHost() && isNpcUid(seatUid));
+      }
+
+      // Immutable fields that must never change after creation.
+      function immutablesPreserved() {
+        return unchanged('code')
+            && unchanged('mode')
+            && unchanged('v')
+            && unchanged('createdAt');
+      }
+
+      // ── READ ──────────────────────────────────────────────────────
+      // Auth-gated: the joiner authenticates anonymously before
+      // reading the room. Blocks unauthenticated enumeration.
+      allow read: if request.auth != null;
+
+      // ── CREATE ────────────────────────────────────────────────────
+      // Validates the initial doc shape so a malicious client cannot
+      // seed a doc with a pre-won state or inflated scores.
+      allow create: if request.auth != null
+        && inc().hostUid == authUid()
+        && inc().v == 1
+        && inc().code == code
+        && validMode(inc().mode)
+        && inc().numSlots >= 2
+        && inc().numSlots <= 6
+        && inc().slots.size() == inc().numSlots
+        && inc().slots[0].uid == authUid()
+        && inc().slots[0].score == 0
+        && inc().status == 'waiting'
+        && inc().winner == null
+        && inc().current == 0
+        && inc().lastRoll == null
+        && inc().lastResult == null
+        && inc().lastRollId == null
+        && inc().lastRolledBy == null
+        && inc().turnStartedAt == null
+        && inc().turnDeadline == null
+        && inc().turnDurationMs > 0
+        && inc().playerUids.size() == 1
+        && inc().playerUids[0] == authUid()
+        && inc().wager == null;
+
+      // ── DELETE ─────────────────────────────────────────────────────
+      // Only the last player in a waiting room may delete the doc.
+      allow delete: if request.auth != null
+        && resource.data.playerUids.size() == 1
+        && authUid() in resource.data.playerUids
+        && resource.data.status == 'waiting';
+
+      // ── UPDATE ─────────────────────────────────────────────────────
+      // Guards invariants: immutable fields, score bounds, turn
+      // ownership (including NPC authorization via host), forward-only
+      // status, winner integrity, and host transfer safety.
+      allow update: if request.auth != null
+        && (isParticipant() || isHost() || isIncomingParticipant())
+        && immutablesPreserved()
+        && inc().numSlots <= cur().numSlots
+        && inc().slots.size() == inc().numSlots
+        && validStatus(inc().status)
+        && (inc().status == cur().status
+            || (cur().status == 'waiting' && inc().status == 'in_progress')
+            || (cur().status == 'in_progress' && inc().status == 'finished'))
+        && scoresNonNegative()
+        && scoresWithinCap()
+        && atMostOneScoreChanged()
+        && inc().playerUids.size() <= cur().playerUids.size() + 1
+        && (
+          (unchanged('current') && unchanged('lastRollId'))
+          || canActForCurrentPlayer()
+        )
+        && (unchanged('winner')
+            || (cur().winner == null
+                && inc().winner != null
+                && inc().winner in inc().playerUids))
+        && (unchanged('hostUid')
+            || (!(cur().hostUid in inc().playerUids)
+                && inc().hostUid in inc().playerUids));
     }
   }
 }
