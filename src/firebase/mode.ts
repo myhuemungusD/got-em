@@ -34,6 +34,9 @@ const env = readEnv();
 /**
  * True when the in-memory mock backend should be used.
  * Derived once at module load — tests and dev both hit the mock.
+ * A production build (or any unknown context) defaults to REAL Firebase
+ * so a misconfigured deploy fails visibly via validateConfig / setup-error
+ * rather than silently running the in-memory mock.
  */
 export const TEST_MODE: boolean =
-  env.MODE === "test" || env.DEV === true || env.PROD !== true;
+  env.MODE === "test" || env.DEV === true;

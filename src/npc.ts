@@ -13,6 +13,7 @@ import type { GameState } from "./state";
 import { state } from "./state";
 import {
   joinRoom,
+  leaveGame,
   rollCraps,
   rollClo,
   rollTen,
@@ -54,6 +55,11 @@ export async function addNpc(code: string, slotIdx: number): Promise<string> {
     throw err;
   }
   return uid;
+}
+
+export async function removeNpc(code: string, uid: string): Promise<void> {
+  activeNpcs.delete(uid);
+  await leaveGame({ code, uid });
 }
 
 export function clearNpcs(): void {

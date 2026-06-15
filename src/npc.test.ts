@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { isNpc, addNpc, clearNpcs, maybeNpcTurn, hasActiveNpcs, getActiveNpcUids } from "./npc";
+import { isNpc, addNpc, removeNpc, clearNpcs, maybeNpcTurn, hasActiveNpcs, getActiveNpcUids } from "./npc";
 import { createRoom, readGame } from "./firebase";
 import { __resetMock } from "./firebase/mock";
 import { setDieSource, resetDieSource } from "./scoring/dice";
@@ -85,6 +85,28 @@ describe("clearNpcs", () => {
 
     clearNpcs();
     expect(hasActiveNpcs()).toBe(false);
+  });
+});
+
+describe("removeNpc", () => {
+  it("removes a single NPC from the room and tracking set", async () => {
+    const code = await createRoom({
+      mode: "craps",
+      numPlayers: 4,
+      hostUid: "host",
+      hostName: "Host",
+    });
+
+    const uid1 = await addNpc(code, 1);
+    const uid2 = await addNpc(code, 2);
+    expect(getActiveNpcUids()).toHaveLength(2);
+
+    await removeNpc(code, uid1);
+    expect(getActiveNpcUids()).toEqual([uid2]);
+
+    const game = await readGame(code);
+    expect(game?.slots[1]?.uid).toBeNull();
+    expect(game?.slots[2]?.uid).toBe(uid2);
   });
 });
 
