@@ -5,6 +5,8 @@ import { joinRoom, startGame, leaveGame, lockWagers, refundWagers } from "../fir
 import { openInviteModal, getSfx } from "../components";
 import { leaveRoom } from "../game-bridge";
 import { addNpc, removeNpc, isNpc, getActiveNpcUids } from "../npc";
+import { escHtml } from "../utils/esc-html";
+import { humanError } from "../utils/human-error";
 
 const LOBBY_HTML = `
   <div class="lobby-topbar">
@@ -48,36 +50,6 @@ const LOBBY_HTML = `
     <button class="btn btn-danger" type="button" data-action="leave">Leave Game</button>
   </div>
 `;
-
-function escHtml(s: string): string {
-  return s.replace(
-    /[&<>"']/g,
-    (c) =>
-      ({
-        "&": "&amp;",
-        "<": "&lt;",
-        ">": "&gt;",
-        '"': "&quot;",
-        "'": "&#39;",
-      })[c] ?? c,
-  );
-}
-
-function humanError(err: unknown): string {
-  const msg = err instanceof Error ? err.message : String(err);
-  if (msg === "WAGER_LOCKED") return "Pot is locked — host must refund first";
-  if (msg === "INVALID_WAGER") return "Buy-in must be a non-negative whole number";
-  if (msg === "INSUFFICIENT_CHIPS") return "Someone can't afford that buy-in";
-  if (msg === "WAGER_NOT_LOCKED") return "No pot to refund";
-  if (msg === "SLOT_TAKEN") return "That seat was just taken";
-  if (msg === "ALREADY_STARTED") return "Game already started";
-  if (msg === "BAD_SLOT") return "Invalid seat";
-  if (msg === "ROOM_NOT_FOUND") return "Room not found";
-  if (msg === "GAME_OVER") return "Game is over";
-  if (msg === "NOT_HOST") return "Only the host can start";
-  if (msg === "NEED_TWO") return "Need at least 2 players";
-  return msg;
-}
 
 function slotMeta(taken: boolean, mine: boolean, isHost: boolean): string {
   if (!taken) return "open slot";

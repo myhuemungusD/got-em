@@ -9,22 +9,9 @@
 import "../styles/invite.css";
 import { buildInviteUrl, shareRoomLink } from "../invite";
 import { makeQrSvg } from "./qr";
+import { escHtml } from "../utils/esc-html";
 
 const QR_SIZE = 220;
-
-function escHtml(s: string): string {
-  return s.replace(
-    /[&<>"']/g,
-    (c) =>
-      ({
-        "&": "&amp;",
-        "<": "&lt;",
-        ">": "&gt;",
-        '"': "&quot;",
-        "'": "&#39;",
-      })[c] ?? c,
-  );
-}
 
 async function copyToClipboard(text: string): Promise<void> {
   try {

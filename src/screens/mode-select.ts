@@ -3,6 +3,7 @@ import { setState, state, subscribe, type GameMode } from "../state";
 import { MODES } from "../modes";
 import { createRoom } from "../firebase";
 import { watchRoom } from "../game-bridge";
+import { escHtml } from "../utils/esc-html";
 
 const MIN_PLAYERS = 2;
 const MAX_PLAYERS = 6;
@@ -36,13 +37,6 @@ function die(pips: readonly string[]): string {
 function modeIcon(mode: GameMode): string {
   const dice = PIP_LAYOUTS[mode].map(die).join("");
   return `<div class="dice-stack">${dice}</div>`;
-}
-
-function escHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
 }
 
 const SCREEN_HTML = `
