@@ -101,7 +101,37 @@ service cloud.firestore {
         return unchanged('code')
             && unchanged('mode')
             && unchanged('v')
-            && unchanged('createdAt');
+            && unchanged('createdAt')
+            && unchanged('turnDurationMs');
+      }
+
+      // Chip values in slots must be non-negative integers (unrolled for max 6 slots).
+      // Only checked when wager is non-null (chips are meaningful).
+      function chipsNonNegativeInt() {
+        let slots = inc().slots;
+        return slots.size() <= 6
+            && (slots.size() < 1 || (slots[0].chips is int && slots[0].chips >= 0))
+            && (slots.size() < 2 || (slots[1].chips is int && slots[1].chips >= 0))
+            && (slots.size() < 3 || (slots[2].chips is int && slots[2].chips >= 0))
+            && (slots.size() < 4 || (slots[3].chips is int && slots[3].chips >= 0))
+            && (slots.size() < 5 || (slots[4].chips is int && slots[4].chips >= 0))
+            && (slots.size() < 6 || (slots[5].chips is int && slots[5].chips >= 0));
+      }
+
+      // Wager integrity: settled cannot revert, total cannot change once set.
+      function wagerIntegrity() {
+        // No wager on either side — nothing to guard.
+        return (cur().wager == null && inc().wager == null)
+            // Wager being set for the first time — allow.
+            || (cur().wager == null && inc().wager != null)
+            // Wager exists on both sides — enforce conservation rules.
+            || (cur().wager != null && inc().wager != null
+                // settled cannot flip back to false once true
+                && (cur().wager.settled == false || inc().wager.settled == true)
+                // total cannot change once set during in_progress
+                && (cur().status != 'in_progress'
+                    || !('total' in cur().wager)
+                    || inc().wager.total == cur().wager.total));
       }
 
       // ── READ ──────────────────────────────────────────────────────
@@ -159,6 +189,8 @@ service cloud.firestore {
         && scoresNonNegative()
         && scoresWithinCap()
         && atMostOneScoreChanged()
+        && wagerIntegrity()
+        && (inc().wager == null || chipsNonNegativeInt())
         && inc().playerUids.size() <= cur().playerUids.size() + 1
         && (
           (unchanged('current') && unchanged('lastRollId'))
