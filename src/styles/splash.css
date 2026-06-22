@@ -193,6 +193,57 @@
   position: relative;
 }
 
+.section-label {
+  font-family: var(--font-display);
+  font-size: 10px;
+  color: var(--text-mute);
+  text-transform: uppercase;
+  letter-spacing: 0.3em;
+  font-weight: 400;
+  margin-top: 4px;
+}
+
+.recent-game {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 16px;
+  background: var(--bg-elev-1);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  text-align: left;
+  width: 100%;
+  cursor: pointer;
+  transition: transform 0.1s, background 0.15s, border-color 0.15s;
+}
+
+.recent-game:active {
+  background: var(--bg-elev-2);
+  transform: scale(0.98);
+  border-color: var(--orange);
+}
+
+.recent-game-code {
+  font-family: var(--font-display);
+  color: var(--orange);
+  font-weight: 400;
+  letter-spacing: 0.2em;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.recent-game-meta {
+  color: var(--text-mute);
+  font-size: 11px;
+  margin-top: 3px;
+  letter-spacing: 0.05em;
+}
+
+.recent-game-arrow {
+  color: var(--text-dim);
+  font-size: 18px;
+}
+
 .splash-disclaimer {
   font-size: 10px;
   color: var(--text-dim);

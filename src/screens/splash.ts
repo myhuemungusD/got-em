@@ -2,6 +2,10 @@ import { setState, state } from "../state";
 import { joinRoom, readGame } from "../firebase";
 import { watchRoom } from "../game-bridge";
 import { getSfx } from "../components";
+import { saveName } from "../auth";
+import { getRecentRooms, rememberRoom } from "../recent";
+import { escHtml } from "../utils/esc-html";
+import { humanError } from "../utils/human-error";
 
 interface SplashRefs {
   nameInput: HTMLInputElement;
@@ -43,14 +47,30 @@ const SPLASH_HTML = `
   <a href="/privacy.html" class="privacy-link" target="_blank" rel="noopener">Privacy</a>
 `;
 
-function humanError(err: unknown): string {
-  const msg = err instanceof Error ? err.message : String(err);
-  if (msg === "ROOM_NOT_FOUND") return "Room not found";
-  if (msg === "GAME_OVER") return "Game is over";
-  if (msg === "ALREADY_STARTED") return "Game already started";
-  if (msg === "SLOT_TAKEN") return "Slot taken";
-  if (msg === "BAD_SLOT") return "Invalid slot";
-  return msg;
+function escAttr(s: string): string {
+  return escHtml(s).replace(/"/g, "&quot;");
+}
+
+function renderRecentRooms(section: HTMLElement, exclude: string | null): void {
+  const rooms = getRecentRooms().filter((c) => c !== exclude);
+  if (rooms.length === 0) {
+    section.innerHTML = "";
+    return;
+  }
+  section.innerHTML =
+    `<div class="section-label">Recent Rooms</div>` +
+    rooms
+      .map(
+        (code) =>
+          `<button class="recent-game" type="button" data-action="join-room" data-code="${escAttr(code)}">` +
+          `<div>` +
+          `<div class="recent-game-code">${escHtml(code)}</div>` +
+          `<div class="recent-game-meta">tap to rejoin</div>` +
+          `</div>` +
+          `<span class="recent-game-arrow">&rsaquo;</span>` +
+          `</button>`,
+      )
+      .join("");
 }
 
 export function mount(root: HTMLElement): () => void {
@@ -85,6 +105,20 @@ export function mount(root: HTMLElement): () => void {
 
   refs.nameInput.value = state.myName;
 
+  const inviteBanner = root.querySelector<HTMLDivElement>("#invite-banner")!;
+  const inviteCode = root.querySelector<HTMLDivElement>("#invite-banner-code")!;
+  const recentSection = root.querySelector<HTMLDivElement>("#recent-section")!;
+  const pendingRoom = state.currentRoom;
+
+  if (pendingRoom) {
+    inviteCode.textContent = pendingRoom;
+    inviteBanner.hidden = false;
+    refs.joinInput.value = pendingRoom;
+    refs.joinRow.hidden = false;
+  }
+
+  renderRecentRooms(recentSection, pendingRoom);
+
   const setStatus = (msg: string): void => {
     refs.statusEl.textContent = msg;
   };
@@ -106,6 +140,7 @@ export function mount(root: HTMLElement): () => void {
 
   const onNewGame = (): void => {
     if (!validateName()) return;
+    saveName(state.myName.trim());
     setStatus("");
     setState({ screen: "mode-select" });
   };
@@ -146,7 +181,8 @@ export function mount(root: HTMLElement): () => void {
         return;
       }
       if (g.playerUids.includes(uid)) {
-        // Already a member — let the bridge subscribe and route by status.
+        saveName(state.myName.trim());
+        rememberRoom(code);
         setState({ currentRoom: code });
         watchRoom(code);
         return;
@@ -161,8 +197,8 @@ export function mount(root: HTMLElement): () => void {
         return;
       }
       await joinRoom({ code, slotIdx: openIdx, uid, name: state.myName.trim() });
-      // The bridge owns the subscription and mirrors the doc into state.game,
-      // which the lobby renderer needs; it also derives the screen from status.
+      saveName(state.myName.trim());
+      rememberRoom(code);
       setState({ currentRoom: code });
       watchRoom(code);
     } catch (err) {
@@ -180,7 +216,10 @@ export function mount(root: HTMLElement): () => void {
     if (e.key !== "Enter") return;
     e.preventDefault();
     refs.nameInput.blur();
-    if (validateName()) setState({ screen: "mode-select" });
+    if (validateName()) {
+      saveName(state.myName.trim());
+      setState({ screen: "mode-select" });
+    }
   };
 
   const onJoinKey = (e: KeyboardEvent): void => {
@@ -198,6 +237,17 @@ export function mount(root: HTMLElement): () => void {
   refs.submitJoinBtn.addEventListener("click", onSubmitJoin);
   refs.sfxBtn.addEventListener("click", onToggleSfx);
 
+  const onRecentClick = (e: Event): void => {
+    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-action="join-room"]');
+    if (!btn) return;
+    const code = btn.dataset["code"];
+    if (!code) return;
+    refs.joinInput.value = code;
+    refs.joinRow.hidden = false;
+    void submitJoin();
+  };
+  recentSection.addEventListener("click", onRecentClick);
+
   return () => {
     refs.nameInput.removeEventListener("input", onName);
     refs.nameInput.removeEventListener("keydown", onNameKey);
@@ -207,6 +257,7 @@ export function mount(root: HTMLElement): () => void {
     refs.joinInput.removeEventListener("keydown", onJoinKey);
     refs.submitJoinBtn.removeEventListener("click", onSubmitJoin);
     refs.sfxBtn.removeEventListener("click", onToggleSfx);
+    recentSection.removeEventListener("click", onRecentClick);
     root.classList.remove("splash");
     root.innerHTML = "";
   };

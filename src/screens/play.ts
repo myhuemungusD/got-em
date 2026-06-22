@@ -15,6 +15,7 @@ import type { Hand } from "../components";
 import { watchRoom, isMyTurn, currentSlot, leaveRoom } from "../game-bridge";
 import { ten10kScoreCombo, scoringIndices } from "../scoring/farkle";
 import { isNpc } from "../npc";
+import { humanError as rawHumanError } from "../utils/human-error";
 
 interface ModeMeta {
   short: string;
@@ -104,23 +105,7 @@ function resultText(g: GameState): string {
 }
 
 function humanError(err: unknown): string {
-  const msg = err instanceof Error ? err.message : String(err);
-  switch (msg) {
-    case "NOT_YOUR_TURN":
-      return "NOT YOUR TURN";
-    case "CHOICE_PENDING":
-      return "KEEP OR BANK FIRST";
-    case "NEED_1000":
-      return "NEED 1000 TO BANK";
-    case "NOT_SCORING_SET":
-      return "NOT A SCORING SET";
-    case "ALL_KEPT_MUST_SCORE":
-      return "ALL KEPT DICE MUST SCORE";
-    case "WRONG_MODE":
-      return "WRONG MODE";
-    default:
-      return msg.toUpperCase();
-  }
+  return rawHumanError(err).toUpperCase();
 }
 
 export function mount(root: HTMLElement): () => void {

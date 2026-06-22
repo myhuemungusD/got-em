@@ -76,6 +76,15 @@ export function loadSavedName(): string {
   }
 }
 
+/** Persist the display name so it survives page reloads. */
+export function saveName(name: string): void {
+  try {
+    localStorage.setItem(NAME_KEY, name);
+  } catch {
+    /* storage unavailable — non-fatal */
+  }
+}
+
 // Deep-link parsing lives in invite.ts (the single source of truth, with
 // charset validation matching real room codes). Re-exported here so boot and
 // auth callers have one import surface.
