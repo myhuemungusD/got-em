@@ -16,8 +16,6 @@
  * UI/animation/haptics from the prototype are intentionally dropped — this
  * chunk is backend only.
  */
-import { TEST_MODE } from "./mode";
-import * as mock from "./mock";
 import { updateGameTx } from "./ops";
 import type { GameDoc, GameMode, RollResult, Slot } from "./types";
 import { rollN } from "../scoring/dice";
@@ -37,17 +35,8 @@ const TEN_ONBOARD_MIN = 1000;
 /* Local helpers                                                        */
 /* -------------------------------------------------------------------- */
 
-function notImpl(name: string): never {
-  const e = new Error(
-    `[firebase/gameplay] ${name} not implemented in TEST_MODE=false build yet`,
-  );
-  (e as Error & { code?: string }).code = "NOT_IMPLEMENTED";
-  throw e;
-}
-
 function nowTs(): number {
-  if (TEST_MODE) return mock.serverTimestamp();
-  return notImpl("serverTimestamp");
+  return Date.now();
 }
 
 /**
