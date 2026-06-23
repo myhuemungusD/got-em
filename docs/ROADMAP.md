@@ -16,6 +16,8 @@ them.
 Field-scoped update rules, turn ownership, score caps, wager/chip conservation,
 additive joins, validated create, host-drives-NPC allowance, delete
 reconciliation, auth-gated reads, and a rules test harness — all shipped.
+Hardened further with `chipsNonNegativeInt()`, `wagerIntegrity()`, and
+`turnDurationMs` immutability guards (PR #55).
 
 ---
 
@@ -50,3 +52,13 @@ reconciliation, auth-gated reads, and a rules test harness — all shipped.
 - **Firebase rules test harness** — scaffolded (`firebase.json` + emulator
   config + `rules.test.ts` with critical test cases). Requires Firebase
   emulator to run locally/in CI.
+- **Production blocker fix** — DONE (PR #55). `gameplay.ts:nowTs()` no longer
+  throws in production builds.
+- **Invite deep-link flow** — DONE (PR #56). Invite banner shows on splash,
+  join code auto-populates, `saveName()` persists player name across sessions.
+- **Recent rooms** — DONE (PR #56). Recent rooms rendered on splash with
+  one-tap rejoin.
+- **Shared utilities** — DONE (PR #56). `escHtml`, `escAttr`, `humanError`
+  extracted to `src/utils/`, removed 5 duplicate copies.
+- **Dependency security** — DONE. `npm audit fix` applied; remaining moderate
+  alerts are in firebase-tools (dev-only, not shipped).
