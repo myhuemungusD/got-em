@@ -29,6 +29,7 @@ async function flush(): Promise<void> {
 beforeEach(() => {
   resetState();
   __resetMock();
+  localStorage.clear();
 });
 
 describe("splash mount", () => {
@@ -217,6 +218,144 @@ describe("splash keyboard", () => {
     const input = root.querySelector<HTMLInputElement>('input[name="player-name"]')!;
     press(input, "Enter");
     expect(state.screen).toBe("mode-select");
+  });
+});
+
+describe("splash invite banner", () => {
+  it("shows the banner and auto-fills the join input when state.currentRoom is set", () => {
+    setState({ currentRoom: "XY9Z" });
+    const root = makeRoot();
+    const cleanup = mount(root);
+
+    const banner = root.querySelector<HTMLDivElement>("#invite-banner")!;
+    expect(banner.hidden).toBe(false);
+    expect(root.querySelector("#invite-banner-code")?.textContent).toBe("XY9Z");
+
+    const joinInput = root.querySelector<HTMLInputElement>("#join-code")!;
+    expect(joinInput.value).toBe("XY9Z");
+
+    const joinRow = root.querySelector<HTMLDivElement>("#join-row")!;
+    expect(joinRow.hidden).toBe(false);
+
+    cleanup();
+  });
+
+  it("keeps the banner hidden when there is no pending room", () => {
+    const root = makeRoot();
+    const cleanup = mount(root);
+
+    const banner = root.querySelector<HTMLDivElement>("#invite-banner")!;
+    expect(banner.hidden).toBe(true);
+    expect(root.querySelector("#invite-banner-code")?.textContent).toBe("----");
+
+    cleanup();
+  });
+});
+
+describe("splash player name persistence", () => {
+  it("saves the trimmed name to localStorage on New Game", () => {
+    setState({ myName: "  Jay  " });
+    const root = makeRoot();
+    mount(root);
+
+    root.querySelector<HTMLButtonElement>('[data-action="new-game"]')!.click();
+
+    expect(localStorage.getItem("streetdice.myName")).toBe("Jay");
+  });
+
+  it("saves the trimmed name to localStorage on Enter in the name field", () => {
+    setState({ myName: "Riley" });
+    const root = makeRoot();
+    mount(root);
+
+    const input = root.querySelector<HTMLInputElement>('input[name="player-name"]')!;
+    press(input, "Enter");
+
+    expect(localStorage.getItem("streetdice.myName")).toBe("Riley");
+  });
+
+  it("does not persist the name when validation fails (empty name)", () => {
+    const root = makeRoot();
+    mount(root);
+
+    root.querySelector<HTMLButtonElement>('[data-action="new-game"]')!.click();
+
+    expect(localStorage.getItem("streetdice.myName")).toBeNull();
+  });
+});
+
+describe("splash recent rooms", () => {
+  it("renders recent room buttons from localStorage", () => {
+    const now = Date.now();
+    localStorage.setItem(
+      "streetdice.recentRooms",
+      JSON.stringify([
+        { code: "AB12", ts: now },
+        { code: "CD34", ts: now - 1000 },
+      ]),
+    );
+    const root = makeRoot();
+    const cleanup = mount(root);
+
+    const buttons = root.querySelectorAll<HTMLButtonElement>('[data-action="join-room"]');
+    expect(buttons.length).toBe(2);
+    expect(buttons[0]!.dataset["code"]).toBe("AB12");
+    expect(buttons[1]!.dataset["code"]).toBe("CD34");
+
+    cleanup();
+  });
+
+  it("excludes the pending room from the recent list", () => {
+    const now = Date.now();
+    localStorage.setItem(
+      "streetdice.recentRooms",
+      JSON.stringify([
+        { code: "AB12", ts: now },
+        { code: "XY9Z", ts: now - 1000 },
+        { code: "CD34", ts: now - 2000 },
+      ]),
+    );
+    setState({ currentRoom: "XY9Z" });
+    const root = makeRoot();
+    const cleanup = mount(root);
+
+    const buttons = root.querySelectorAll<HTMLButtonElement>('[data-action="join-room"]');
+    expect(buttons.length).toBe(2);
+    expect(buttons[0]!.dataset["code"]).toBe("AB12");
+    expect(buttons[1]!.dataset["code"]).toBe("CD34");
+
+    cleanup();
+  });
+
+  it("renders nothing when there are no recent rooms", () => {
+    const root = makeRoot();
+    const cleanup = mount(root);
+
+    const section = root.querySelector<HTMLDivElement>("#recent-section")!;
+    expect(section.innerHTML).toBe("");
+    expect(section.querySelectorAll('[data-action="join-room"]').length).toBe(0);
+
+    cleanup();
+  });
+
+  it("clicking a recent room button fills the join input with the code", () => {
+    const now = Date.now();
+    localStorage.setItem(
+      "streetdice.recentRooms",
+      JSON.stringify([{ code: "AB12", ts: now }]),
+    );
+    setState({ myName: "Jay", myUid: "uid-jay" });
+    const root = makeRoot();
+    mount(root);
+
+    const btn = root.querySelector<HTMLButtonElement>('[data-action="join-room"]')!;
+    btn.click();
+
+    const joinInput = root.querySelector<HTMLInputElement>("#join-code")!;
+    expect(joinInput.value).toBe("AB12");
+
+    const joinRow = root.querySelector<HTMLDivElement>("#join-row")!;
+    expect(joinRow.hidden).toBe(false);
   });
 });
 

@@ -4,7 +4,7 @@ import { watchRoom } from "../game-bridge";
 import { getSfx } from "../components";
 import { saveName } from "../auth";
 import { getRecentRooms, rememberRoom } from "../recent";
-import { escHtml } from "../utils/esc-html";
+import { escAttr, escHtml } from "../utils/esc-html";
 import { humanError } from "../utils/human-error";
 
 interface SplashRefs {
@@ -47,9 +47,6 @@ const SPLASH_HTML = `
   <a href="/privacy.html" class="privacy-link" target="_blank" rel="noopener">Privacy</a>
 `;
 
-function escAttr(s: string): string {
-  return escHtml(s).replace(/"/g, "&quot;");
-}
 
 function renderRecentRooms(section: HTMLElement, exclude: string | null): void {
   const rooms = getRecentRooms().filter((c) => c !== exclude);
