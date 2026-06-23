@@ -299,8 +299,8 @@ describe("splash recent rooms", () => {
 
     const buttons = root.querySelectorAll<HTMLButtonElement>('[data-action="join-room"]');
     expect(buttons.length).toBe(2);
-    expect(buttons[0].dataset["code"]).toBe("AB12");
-    expect(buttons[1].dataset["code"]).toBe("CD34");
+    expect(buttons[0]!.dataset["code"]).toBe("AB12");
+    expect(buttons[1]!.dataset["code"]).toBe("CD34");
 
     cleanup();
   });
@@ -321,8 +321,8 @@ describe("splash recent rooms", () => {
 
     const buttons = root.querySelectorAll<HTMLButtonElement>('[data-action="join-room"]');
     expect(buttons.length).toBe(2);
-    expect(buttons[0].dataset["code"]).toBe("AB12");
-    expect(buttons[1].dataset["code"]).toBe("CD34");
+    expect(buttons[0]!.dataset["code"]).toBe("AB12");
+    expect(buttons[1]!.dataset["code"]).toBe("CD34");
 
     cleanup();
   });
