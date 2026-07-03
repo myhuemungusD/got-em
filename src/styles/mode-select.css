@@ -289,3 +289,14 @@
   gap: 8px;
   background: linear-gradient(to top, var(--bg) 0%, var(--bg) 70%, transparent 100%);
 }
+
+.mode-select .create-status {
+  font-size: 12px;
+  color: var(--red);
+  letter-spacing: 0.05em;
+  text-align: center;
+}
+
+.mode-select .create-status:empty {
+  display: none;
+}

@@ -487,6 +487,7 @@ export async function readGame(code: string): Promise<GameDoc | undefined> {
 export function subscribeGame(
   code: string,
   onNext: (doc: GameDoc | undefined) => void,
+  onError?: (err: Error) => void,
 ): Unsubscribe {
   if (TEST_MODE) {
     return mock.onSnapshot<GameDoc>(
@@ -501,6 +502,7 @@ export function subscribeGame(
     (snap) => {
       onNext(snap.data());
     },
+    onError,
   );
 }
 

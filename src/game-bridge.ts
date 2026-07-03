@@ -13,6 +13,7 @@ import { setState, state } from "./state";
 import { subscribeGame, settlePot } from "./firebase";
 import type { GameDoc, GameState, Slot, Unsubscribe } from "./firebase";
 import { maybeNpcTurn, clearNpcs } from "./npc";
+import { humanError } from "./utils/human-error";
 
 export interface WatchRoomHooks {
   animateRoll?: (values: number[]) => Promise<void>;
@@ -108,11 +109,20 @@ export function watchRoom(code: string, hooks: WatchRoomHooks = {}): () => void 
   }
   clearNpcs();
 
-  const unsub = subscribeGame(code, (doc) => {
-    handleDoc(doc, hooks).catch((err: unknown) => {
-      setState({ lastError: err instanceof Error ? err.message : String(err) });
-    });
-  });
+  const unsub = subscribeGame(
+    code,
+    (doc) => {
+      handleDoc(doc, hooks).catch((err: unknown) => {
+        setState({ lastError: err instanceof Error ? err.message : String(err) });
+      });
+    },
+    (err) => {
+      // Firestore kills an errored listener permanently — without this the
+      // table silently freezes. Route to the recoverable error screen; the
+      // player can reload and rejoin via Recent Rooms.
+      setState({ lastError: humanError(err), screen: "setup-error" });
+    },
+  );
 
   activeUnsub = unsub;
   setState({ currentRoom: code });

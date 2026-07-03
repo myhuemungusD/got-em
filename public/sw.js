@@ -1,9 +1,16 @@
 const CACHE = "streetdice-v2";
 
-self.addEventListener("install", () => {
-  // Don't precache — Vite emits hashed asset URLs we can't know at SW-build
-  // time. Assets are cached on first fetch (cache-first below); navigations
-  // go network-first so new deploys aren't held back by stale cached HTML.
+self.addEventListener("install", (event) => {
+  // Precache only the app shell ("/") so a first launch offline still boots
+  // to something. Hashed assets can't be known at SW-build time — they're
+  // cached on first fetch (cache-first below); navigations go network-first
+  // so new deploys aren't held back by stale cached HTML.
+  event.waitUntil(
+    caches
+      .open(CACHE)
+      .then((c) => c.add("/"))
+      .catch(() => undefined),
+  );
   self.skipWaiting();
 });
 
@@ -50,8 +57,11 @@ self.addEventListener("fetch", (event) => {
           return resp;
         })
         .catch(() =>
+          // ignoreSearch: invite deep-links like /?room=ABCD are cached under
+          // their full URL and would otherwise miss every fallback offline.
           caches
-            .match(req)
+            .match(req, { ignoreSearch: true })
+            .then((hit) => hit ?? caches.match("/"))
             .then((hit) => hit ?? caches.match("/index.html"))
             .then((hit) => hit ?? Response.error()),
         ),
