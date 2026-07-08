@@ -20,6 +20,7 @@ export interface WatchRoomHooks {
 }
 
 let activeUnsub: Unsubscribe | null = null;
+let activeCode: string | null = null;
 
 function screenForStatus(status: GameState["status"]): "lobby" | "play" | "gameover" {
   switch (status) {
@@ -107,7 +108,12 @@ export function watchRoom(code: string, hooks: WatchRoomHooks = {}): () => void 
     activeUnsub();
     activeUnsub = null;
   }
-  clearNpcs();
+  // Screens re-run watchRoom on mount (lobby → play → gameover) to swap
+  // hooks. Only forget our NPCs when actually changing rooms — clearing on
+  // every re-watch orphaned the CPU the moment the play screen mounted,
+  // leaving it to stall out the 30s turn timer every round.
+  if (activeCode !== code) clearNpcs();
+  activeCode = code;
 
   const unsub = subscribeGame(
     code,
@@ -144,6 +150,7 @@ export function stopWatching(): void {
     activeUnsub();
     activeUnsub = null;
   }
+  activeCode = null;
   clearNpcs();
   setState({ game: null, currentRoom: null, lastSeenRollId: null });
 }

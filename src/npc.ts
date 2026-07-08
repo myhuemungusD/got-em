@@ -91,18 +91,30 @@ export function maybeNpcTurn(g: GameState): void {
   }
 
   if (g.status !== "in_progress") return;
-  if (state.isAnimatingRoll) return;
 
   const slot = g.slots[g.current];
   if (!slot?.uid || !activeNpcs.has(slot.uid)) return;
 
-  const uid = slot.uid;
-  const code = g.code;
   const delay = 800 + Math.random() * 1200;
 
+  // Re-validate at fire time against the CURRENT doc, not the one captured
+  // at schedule time: the turn may have moved (auto-advance) meanwhile.
+  // If a roll animation is still playing, re-defer instead of skipping —
+  // an early return here is a lost wakeup (nothing re-invokes us when the
+  // animation ends) and the NPC would stall out its whole 30s turn.
   pendingTimer = setTimeout(() => {
     pendingTimer = null;
-    void executeNpcTurn(code, uid, g).catch((err: unknown) => {
+    // state.game is kept fresh by game-bridge; fall back to the scheduling
+    // doc for direct callers (tests) that don't populate app state.
+    const cur = state.game ?? g;
+    if (cur.status !== "in_progress") return;
+    const curSlot = cur.slots[cur.current];
+    if (!curSlot?.uid || !activeNpcs.has(curSlot.uid)) return;
+    if (state.isAnimatingRoll) {
+      maybeNpcTurn(cur);
+      return;
+    }
+    void executeNpcTurn(cur.code, curSlot.uid, cur).catch((err: unknown) => {
       console.warn("[npc] turn failed:", err instanceof Error ? err.message : err);
     });
   }, delay);

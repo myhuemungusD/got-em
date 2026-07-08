@@ -49,6 +49,23 @@ fixed on this branch (see "Fixed in this audit" below).
 | Minor | `apple-touch-icon` was 192×192; regenerated at the proper 180×180 and declared `sizes` | `public/icons/apple-touch-icon.png`, `index.html` |
 | Polish | OG/Twitter card pointed a square icon at a `summary_large_image` card — now uses the 1024×500 feature graphic. Added `<noscript>` fallback. Host name trimmed before room creation | `index.html`, `src/screens/mode-select.ts` |
 
+Found by actually running the app in a browser (second pass):
+
+| Severity | Fix | Files |
+|---|---|---|
+| Blocker | **Infinite remount freeze**: the router recorded `currentScreen` only *after* a mount returned, but play's mount synchronously re-enters `setState` (mock snapshots fire synchronously) → re-entrant `apply("play")` remounted forever, freezing the tab. `currentScreen` is now set before mounting | `src/router.ts` |
+| Blocker | **CPU opponent never rolled** (single-player broken): (1) play's mount re-runs `watchRoom`, which unconditionally `clearNpcs()`-ed — the host forgot its NPCs the moment the game started; (2) `maybeNpcTurn` early-returned during roll animations with nothing to re-invoke it (lost wakeup) — the CPU stalled its full 30s turn. `watchRoom` now only clears NPCs on a room *change*; NPC turns re-validate at fire time and re-defer during animations | `src/game-bridge.ts`, `src/npc.ts` |
+| Major | Lobby buttons rendered while `busy` was baked into the DOM as `disabled` and never re-rendered when `busy` flipped back — a dead Start button after adding a CPU. Every action now re-renders on completion | `src/screens/lobby.ts` |
+| Minor | Mock `notify` iterated a live `Set` — a listener resubscribing mid-notify extends iteration unboundedly. Now iterates a copy | `src/firebase/mock.ts` |
+
+**Deployment finding:** the game is **not deployed anywhere**. `got-em.vercel.app`
+(hardcoded in `index.html`, `robots.txt`, `sitemap.xml`, `twa/`) does not belong
+to this Vercel account — the two existing projects (`play` → SkateHubba-play
+repo, `designmainline`) are other apps. Until got-em is deployed with real
+`VITE_FIREBASE_*` env vars, invite links/QRs only ever point at the host's own
+dev session, and dev mode's in-memory mock means no second device can join at
+all. Deploying is a prerequisite for every store step above.
+
 ---
 
 ## Path to Google Play (do these in order)

@@ -126,6 +126,7 @@ export function mount(root: HTMLElement): () => void {
       setStatus(humanError(err));
     } finally {
       busy = false;
+      onState();
     }
   };
 
@@ -144,6 +145,7 @@ export function mount(root: HTMLElement): () => void {
     } finally {
       busy = false;
       startBtn.disabled = false;
+      onState();
     }
   };
 
@@ -190,6 +192,7 @@ export function mount(root: HTMLElement): () => void {
     } finally {
       busy = false;
       wagerLockBtn.disabled = false;
+      onState();
     }
   };
 
@@ -206,6 +209,7 @@ export function mount(root: HTMLElement): () => void {
     } finally {
       busy = false;
       wagerRefundBtn.disabled = false;
+      onState();
     }
   };
 
@@ -246,7 +250,10 @@ export function mount(root: HTMLElement): () => void {
     } catch (err) {
       setStatus(humanError(err));
     } finally {
+      // Re-render: a synchronous snapshot may have rendered while busy was
+      // true, baking disabled buttons into the DOM.
       busy = false;
+      onState();
     }
   };
 
@@ -262,6 +269,7 @@ export function mount(root: HTMLElement): () => void {
       setStatus(humanError(err));
     } finally {
       busy = false;
+      onState();
     }
   };
 

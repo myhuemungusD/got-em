@@ -39,11 +39,15 @@ export function startRouter(options: RouterOptions): Router {
       cleanup = null;
     }
     showOnly(next);
+    // Record the screen BEFORE mounting: a mount may synchronously feed a
+    // snapshot through game-bridge back into setState (the mock backend
+    // delivers the initial snapshot synchronously), and a re-entrant
+    // apply(next) must see it as current or it remounts forever.
+    currentScreen = next;
     const root = options.getScreenRoot(next);
     if (root) {
       cleanup = mounts[next](root);
     }
-    currentScreen = next;
   };
 
   apply(state.screen);

@@ -44,7 +44,9 @@ function notify(path: string): void {
   const cbs = listeners.get(path);
   if (!cbs) return;
   const snap = snapOf<AnyData>(path);
-  for (const cb of cbs) {
+  // Iterate a copy: a listener may resubscribe (watchRoom during a screen
+  // mount), and Set iteration visits entries added mid-loop — unbounded.
+  for (const cb of [...cbs]) {
     try {
       cb(snap);
     } catch (e) {
