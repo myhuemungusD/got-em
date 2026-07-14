@@ -54,7 +54,7 @@ export async function ensureAuth(): Promise<string> {
       if (err instanceof Error && err.message.includes("missing config")) {
         throw err;
       }
-      throw new Error("AUTH_FAILED");
+      throw new Error("AUTH_FAILED", { cause: err });
     }
   }
 
