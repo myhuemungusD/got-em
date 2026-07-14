@@ -8,6 +8,7 @@ const MESSAGES: Record<string, string> = {
   NEED_TWO: "Need at least 2 players",
   TOO_FEW_PLAYERS: "Need at least 2 players",
   CODE_GEN_FAILED: "Couldn't create a room — try again",
+  AUTH_FAILED: "Couldn't sign in — check your connection and reload",
   WAGER_LOCKED: "Pot is locked — host must refund first",
   INVALID_WAGER: "Buy-in must be a non-negative whole number",
   INSUFFICIENT_CHIPS: "Someone can't afford that buy-in",

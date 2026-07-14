@@ -1,6 +1,7 @@
 import "../styles/boot.css";
 import { setState, state } from "../state";
 import { ensureAuth, getCodeFromUrl, loadSavedName } from "../auth";
+import { humanError } from "../utils/human-error";
 
 const BOOT_HTML = `
   <div class="boot">
@@ -37,8 +38,7 @@ export function mount(root: HTMLElement): () => void {
     setState({ screen: "splash" });
   })().catch((err: unknown) => {
     if (cancelled) return;
-    const message = err instanceof Error ? err.message : String(err);
-    setState({ screen: "setup-error", lastError: message });
+    setState({ screen: "setup-error", lastError: humanError(err) });
   });
 
   return () => {
