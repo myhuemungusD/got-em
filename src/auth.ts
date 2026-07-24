@@ -47,8 +47,14 @@ export async function ensureAuth(): Promise<string> {
     const { signInAnon } = await import("./firebase/real");
     try {
       return await signInAnon();
-    } catch {
-      throw new Error("AUTH_FAILED");
+    } catch (err) {
+      // Keep the config-validation diagnostic ("missing config: apiKey, …")
+      // — collapsing it into AUTH_FAILED made a misconfigured deploy
+      // indistinguishable from a network/auth outage on the error screen.
+      if (err instanceof Error && err.message.includes("missing config")) {
+        throw err;
+      }
+      throw new Error("AUTH_FAILED", { cause: err });
     }
   }
 

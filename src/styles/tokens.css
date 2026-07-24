@@ -94,8 +94,11 @@ input:focus {
 
 #app {
   position: relative;
-  height: 100dvh;
+  /* 100vh is the fallback; 100dvh must come LAST so it wins where supported —
+     otherwise iOS Safari sizes to the large viewport and the bottom action
+     bar hides behind the browser toolbar. */
   height: 100vh;
+  height: 100dvh;
   width: 100vw;
   max-width: 560px;
   margin: 0 auto;

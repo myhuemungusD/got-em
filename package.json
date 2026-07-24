@@ -33,7 +33,7 @@
     "preview": "vite preview",
     "test": "vitest run --passWithNoTests",
     "test:coverage": "vitest run --passWithNoTests --coverage",
-    "test:rules": "firebase emulators:exec --only firestore -- npx vitest run --config vitest.rules.config.ts",
+    "test:rules": "firebase emulators:exec --only firestore --project demo-gotem \"npx vitest run --config vitest.rules.config.ts\"",
     "test:watch": "vitest --passWithNoTests",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --max-warnings=0"

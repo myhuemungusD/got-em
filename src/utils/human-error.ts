@@ -6,6 +6,9 @@ const MESSAGES: Record<string, string> = {
   BAD_SLOT: "Invalid seat",
   NOT_HOST: "Only the host can start",
   NEED_TWO: "Need at least 2 players",
+  TOO_FEW_PLAYERS: "Need at least 2 players",
+  CODE_GEN_FAILED: "Couldn't create a room — try again",
+  AUTH_FAILED: "Couldn't sign in — check your connection and reload",
   WAGER_LOCKED: "Pot is locked — host must refund first",
   INVALID_WAGER: "Buy-in must be a non-negative whole number",
   INSUFFICIENT_CHIPS: "Someone can't afford that buy-in",
@@ -20,5 +23,14 @@ const MESSAGES: Record<string, string> = {
 
 export function humanError(err: unknown): string {
   const msg = err instanceof Error ? err.message : String(err);
-  return MESSAGES[msg] ?? msg;
+  const mapped = MESSAGES[msg];
+  if (mapped) return mapped;
+  // Firestore SDK errors ("Failed to get document because the client is
+  // offline", "unavailable", …) shouldn't surface verbatim.
+  if (/offline|network|unavailable/i.test(msg)) {
+    return "You're offline — check your connection and try again";
+  }
+  // Unknown internal ALL_CAPS codes shouldn't leak raw either.
+  if (/^[A-Z0-9_]{2,}$/.test(msg)) return "Something went wrong — try again";
+  return msg;
 }

@@ -4,6 +4,7 @@ import { MODES } from "../modes";
 import { createRoom } from "../firebase";
 import { watchRoom } from "../game-bridge";
 import { escHtml } from "../utils/esc-html";
+import { humanError } from "../utils/human-error";
 
 const MIN_PLAYERS = 2;
 const MAX_PLAYERS = 6;
@@ -58,6 +59,7 @@ const SCREEN_HTML = `
     </div>
   </div>
   <div class="screen-footer">
+    <div class="create-status" id="create-status" role="status" aria-live="polite"></div>
     <button class="btn btn-primary" type="button" data-action="create-game" id="btn-create-game">Create Game</button>
     <button class="btn btn-ghost" type="button" data-action="back">Cancel</button>
   </div>
@@ -76,6 +78,7 @@ export function mount(root: HTMLElement): () => void {
   const downBtn = root.querySelector<HTMLButtonElement>('[data-action="players-down"]')!;
   const upBtn = root.querySelector<HTMLButtonElement>('[data-action="players-up"]')!;
   const createBtn = root.querySelector<HTMLButtonElement>("#btn-create-game")!;
+  const statusEl = root.querySelector<HTMLDivElement>("#create-status")!;
   const backBtns = root.querySelectorAll<HTMLButtonElement>('[data-action="back"]');
 
   grid.innerHTML = MODES.map(
@@ -125,18 +128,20 @@ export function mount(root: HTMLElement): () => void {
   const createGame = async (): Promise<void> => {
     if (busy || !state.myUid) return;
     busy = true;
+    statusEl.textContent = "";
     render();
     try {
       const code = await createRoom({
         mode: state.selectedMode,
         numPlayers: state.selectedPlayerCount,
         hostUid: state.myUid,
-        hostName: state.myName,
+        hostName: state.myName.trim(),
       });
       setState({ currentRoom: code });
       watchRoom(code);
     } catch (err) {
       setState({ lastError: err instanceof Error ? err.message : String(err) });
+      statusEl.textContent = humanError(err);
       busy = false;
       render();
     }

@@ -1,12 +1,15 @@
 /* Gameover screen — ported from prototypes/gotem.html (lines 571–621, 926–937). */
 .gameover {
   padding: 24px 20px;
-  justify-content: center;
+  /* See .splash: flex-start + auto margins = centered when it fits,
+     scrollable when it doesn't (6-player tables on short screens). */
+  justify-content: flex-start;
   align-items: center;
   gap: 14px;
   text-align: center;
   position: relative;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .gameover::before {
@@ -20,6 +23,7 @@
 }
 
 .winner-trophy {
+  margin-top: auto;
   font-size: 72px;
   line-height: 1;
   filter: drop-shadow(0 0 24px rgba(255, 193, 7, 0.6));
@@ -159,6 +163,7 @@
   flex-direction: column;
   gap: 8px;
   margin-top: 14px;
+  margin-bottom: auto;
   position: relative;
   z-index: 1;
 }

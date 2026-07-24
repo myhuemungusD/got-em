@@ -135,13 +135,23 @@ export async function getDoc<T = DocumentData>(
 export function onSnapshot<T = DocumentData>(
   ref: DocRef,
   onNext: (snap: DocSnapshot<T>) => void,
+  onError?: (err: Error) => void,
 ): Unsubscribe {
-  return fsOnSnapshot(toRealRef(ref), (snap) => {
-    onNext({
-      exists: () => snap.exists(),
-      data: () => (snap.exists() ? (snap.data() as T) : undefined),
-    });
-  });
+  // Without an error observer Firestore terminates an errored listener
+  // PERMANENTLY and silently — the game would freeze with no signal. Always
+  // register one so callers can surface a reconnect path.
+  return fsOnSnapshot(
+    toRealRef(ref),
+    (snap) => {
+      onNext({
+        exists: () => snap.exists(),
+        data: () => (snap.exists() ? (snap.data() as T) : undefined),
+      });
+    },
+    (err) => {
+      onError?.(err);
+    },
+  );
 }
 
 /**

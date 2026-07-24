@@ -1,11 +1,15 @@
 /* Splash screen — ported from prototypes/gotem.html (lines 87–138, 793–811). */
 .splash {
   padding: 24px;
-  justify-content: center;
+  /* flex-start + auto margins on the first/last in-flow children centers the
+     stack when it fits and collapses to a scrollable top-aligned column on
+     short viewports (iPhone SE, landscape) instead of clipping both ends. */
+  justify-content: flex-start;
   align-items: center;
   gap: 14px;
   text-align: center;
   position: relative;
+  overflow-y: auto;
 }
 
 .splash::before {
@@ -20,6 +24,7 @@
 }
 
 .splash-logo {
+  margin-top: auto;
   font-family: var(--font-display);
   font-size: 84px;
   line-height: 0.85;
@@ -254,6 +259,7 @@
 
 .privacy-link {
   margin-top: 12px;
+  margin-bottom: auto;
   font-size: 11px;
   color: var(--text-dim);
   letter-spacing: 0.15em;
