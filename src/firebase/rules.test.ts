@@ -167,6 +167,17 @@ describe("read rules", () => {
     const db = authed.firestore();
     await assertSucceeds(db.collection("games").doc("ABCD").get());
   });
+
+  it("rejects listing the whole games collection", async () => {
+    // `allow read` covers get AND list, so the previous form let any
+    // anonymous client dump every live room — codes, uids, names, pots —
+    // turning "guess a 4-char code" into an index of every table.
+    await seedDoc(testEnv, "ABCD", makeValidGameDoc());
+    await seedDoc(testEnv, "WXYZ", makeValidGameDoc({ code: "WXYZ" }));
+    const authed = testEnv.authenticatedContext("outsider");
+    const db = authed.firestore();
+    await assertFails(db.collection("games").get());
+  });
 });
 
 /* ==================================================================== */
@@ -310,6 +321,75 @@ describe("update rules: turn ownership", () => {
       db.collection("games").doc(GAME_CODE).update({
         current: 1,
         lastRollId: "roll-xyz",
+        updatedAt: Date.now(),
+      }),
+    );
+  });
+
+  it("lets a seated non-current player advance an EXPIRED turn", async () => {
+    // The shipped turn timer: once turnDeadline lapses, any seated player
+    // may advanceTurn. Without a deadline branch in the rules this write is
+    // denied for every non-current client and a table stalled by a
+    // disconnected player deadlocks permanently.
+    await seedDoc(
+      testEnv,
+      GAME_CODE,
+      makeInProgressDoc({
+        code: GAME_CODE,
+        turnStartedAt: Date.now() - 60000,
+        turnDeadline: Date.now() - 30000, // already lapsed
+      }),
+    );
+
+    const ctx = testEnv.authenticatedContext(PLAYER_UID);
+    const db = ctx.firestore();
+    await assertSucceeds(
+      db.collection("games").doc(GAME_CODE).update({
+        current: 1,
+        turnStartedAt: Date.now(),
+        turnDeadline: Date.now() + 30000,
+        updatedAt: Date.now(),
+      }),
+    );
+  });
+
+  it("still rejects a non-current player before the deadline lapses", async () => {
+    await seedDoc(
+      testEnv,
+      GAME_CODE,
+      makeInProgressDoc({
+        code: GAME_CODE,
+        turnStartedAt: Date.now(),
+        turnDeadline: Date.now() + 30000, // still live
+      }),
+    );
+
+    const ctx = testEnv.authenticatedContext(PLAYER_UID);
+    const db = ctx.firestore();
+    await assertFails(
+      db.collection("games").doc(GAME_CODE).update({
+        current: 1,
+        updatedAt: Date.now(),
+      }),
+    );
+  });
+
+  it("rejects an outsider advancing even an expired turn", async () => {
+    await seedDoc(
+      testEnv,
+      GAME_CODE,
+      makeInProgressDoc({
+        code: GAME_CODE,
+        turnStartedAt: Date.now() - 60000,
+        turnDeadline: Date.now() - 30000,
+      }),
+    );
+
+    const ctx = testEnv.authenticatedContext("outsider");
+    const db = ctx.firestore();
+    await assertFails(
+      db.collection("games").doc(GAME_CODE).update({
+        current: 1,
         updatedAt: Date.now(),
       }),
     );

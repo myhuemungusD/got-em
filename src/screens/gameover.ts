@@ -23,6 +23,10 @@ const GAMEOVER_HTML = `
 
 function rankLabel(idx: number, isWinner: boolean): string {
   if (isWinner) return "1st";
+  // Rows are score-sorted, so the winner is not always index 0 (ties keep
+  // slot order). Derive the suffix from the position rather than assuming
+  // index 0 is the winner, which otherwise renders "1th".
+  if (idx === 0) return "1st";
   if (idx === 1) return "2nd";
   if (idx === 2) return "3rd";
   return `${idx + 1}th`;

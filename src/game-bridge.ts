@@ -22,6 +22,28 @@ export interface WatchRoomHooks {
 let activeUnsub: Unsubscribe | null = null;
 let activeCode: string | null = null;
 
+/**
+ * Snapshot serialization. `handleDoc` awaits the roll animation (~2s) and
+ * more snapshots arrive during it. Without serialization the newer doc was
+ * applied first and then OVERWRITTEN by the older invocation resuming —
+ * reverting the board, and in the worst case routing back to `play` from a
+ * finished game that will never write again.
+ *
+ * Only the newest pending doc is kept: a snapshot superseded during an
+ * animation is stale by definition, and applying the intermediate states
+ * would just replay them at the wrong time.
+ */
+let handlingDoc = false;
+let queuedDoc: GameDoc | undefined;
+let hasQueuedDoc = false;
+
+/**
+ * Bumped whenever the watched room changes or is torn down. Guards both the
+ * queued doc and the in-flight one (which re-checks after its await), so a
+ * late update to the room we just left can't re-route the player back in.
+ */
+let watchGen = 0;
+
 function screenForStatus(status: GameState["status"]): "lobby" | "play" | "gameover" {
   switch (status) {
     case "waiting":
@@ -42,7 +64,39 @@ function isNewRemoteRoll(doc: GameDoc): boolean {
   );
 }
 
-async function handleDoc(doc: GameDoc | undefined, hooks: WatchRoomHooks): Promise<void> {
+/**
+ * Runs `handleDoc` one at a time. Starts synchronously when idle, so the
+ * common no-animation path applies state in the same tick the snapshot
+ * arrives — the ordering the screens and their tests rely on.
+ */
+function dispatchDoc(doc: GameDoc | undefined, hooks: WatchRoomHooks, gen: number): void {
+  if (gen !== watchGen) return;
+  if (handlingDoc) {
+    queuedDoc = doc;
+    hasQueuedDoc = true;
+    return;
+  }
+  handlingDoc = true;
+  void handleDoc(doc, hooks, gen)
+    .catch((err: unknown) => {
+      setState({ lastError: err instanceof Error ? err.message : String(err) });
+    })
+    .finally(() => {
+      handlingDoc = false;
+      if (hasQueuedDoc) {
+        const next = queuedDoc;
+        queuedDoc = undefined;
+        hasQueuedDoc = false;
+        dispatchDoc(next, hooks, gen);
+      }
+    });
+}
+
+async function handleDoc(
+  doc: GameDoc | undefined,
+  hooks: WatchRoomHooks,
+  gen: number,
+): Promise<void> {
   if (!doc) {
     await leaveRoom();
     return;
@@ -62,6 +116,10 @@ async function handleDoc(doc: GameDoc | undefined, hooks: WatchRoomHooks): Promi
     } finally {
       setState({ isAnimatingRoll: false });
     }
+    // We suspended for the length of the animation. If the room was left or
+    // swapped meanwhile, this doc is stale — applying it would drag the
+    // player back into a room they are no longer watching.
+    if (gen !== watchGen) return;
   } else if (doc.lastRollId !== null) {
     setState({ lastSeenRollId: doc.lastRollId });
   }
@@ -95,7 +153,7 @@ function maybeAutoSettle(doc: GameDoc): void {
   if (doc.wager === null || doc.wager.settled) return;
   if (doc.winner === null) return;
   if (state.myUid !== doc.hostUid) return;
-  void settlePot({ code: doc.code }).catch((err: unknown) => {
+  void settlePot({ code: doc.code, hostUid: doc.hostUid }).catch((err: unknown) => {
     const msg = err instanceof Error ? err.message : String(err);
     if (msg !== "ALREADY_SETTLED") {
       setState({ lastError: msg });
@@ -114,13 +172,12 @@ export function watchRoom(code: string, hooks: WatchRoomHooks = {}): () => void 
   // leaving it to stall out the 30s turn timer every round.
   if (activeCode !== code) clearNpcs();
   activeCode = code;
+  const gen = ++watchGen;
 
   const unsub = subscribeGame(
     code,
     (doc) => {
-      handleDoc(doc, hooks).catch((err: unknown) => {
-        setState({ lastError: err instanceof Error ? err.message : String(err) });
-      });
+      dispatchDoc(doc, hooks, gen);
     },
     (err) => {
       // Firestore kills an errored listener permanently — without this the
@@ -151,6 +208,7 @@ export function stopWatching(): void {
     activeUnsub = null;
   }
   activeCode = null;
+  watchGen++;
   clearNpcs();
   setState({ game: null, currentRoom: null, lastSeenRollId: null });
 }
