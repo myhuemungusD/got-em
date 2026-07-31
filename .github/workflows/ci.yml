@@ -22,10 +22,18 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: npm
+      # The Firestore emulator is a Java process. Without this the rules
+      # suite cannot run, which is why firestore.rules has been shipping
+      # unverified — `npm test` deliberately excludes it.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
       - run: npm ci
       - run: npm run typecheck
       - run: npm run lint
       - run: npm test
+      - run: npm run test:rules
       - run: npm run test:coverage
       - uses: actions/upload-artifact@v4
         with:
