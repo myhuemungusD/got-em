@@ -148,7 +148,7 @@ describe("settlePot", () => {
     const code = await lobbyOfTwo();
     await lockWagers({ code, hostUid: "u1", amount: 25 }); // both at 75, pot 50
     await finish(code, "u2");
-    await settlePot({ code });
+    await settlePot({ code, hostUid: "u1" });
     const doc = (await readGame(code)) as GameDoc;
 
     expect(doc.slots[0]!.chips).toBe(75); // loser unchanged
@@ -161,8 +161,8 @@ describe("settlePot", () => {
     const code = await lobbyOfTwo();
     await lockWagers({ code, hostUid: "u1", amount: 25 });
     await finish(code, "u2");
-    await settlePot({ code });
-    await expect(settlePot({ code })).rejects.toThrow("ALREADY_SETTLED");
+    await settlePot({ code, hostUid: "u1" });
+    await expect(settlePot({ code, hostUid: "u1" })).rejects.toThrow("ALREADY_SETTLED");
     const doc = (await readGame(code)) as GameDoc;
     // Winner not paid twice.
     expect(doc.slots[1]!.chips).toBe(125);
@@ -171,26 +171,35 @@ describe("settlePot", () => {
   it("rejects when no wager is locked", async () => {
     const code = await lobbyOfTwo();
     await finish(code, "u2");
-    await expect(settlePot({ code })).rejects.toThrow("WAGER_NOT_LOCKED");
+    await expect(settlePot({ code, hostUid: "u1" })).rejects.toThrow("WAGER_NOT_LOCKED");
   });
 
   it("rejects when the game is not finished", async () => {
     const code = await lobbyOfTwo();
     await lockWagers({ code, hostUid: "u1", amount: 25 });
-    await expect(settlePot({ code })).rejects.toThrow("INVALID_SETTLEMENT");
+    await expect(settlePot({ code, hostUid: "u1" })).rejects.toThrow("INVALID_SETTLEMENT");
   });
 
   it("rejects when there is no winner", async () => {
     const code = await lobbyOfTwo();
     await lockWagers({ code, hostUid: "u1", amount: 25 });
     await finish(code, null);
-    await expect(settlePot({ code })).rejects.toThrow("INVALID_SETTLEMENT");
+    await expect(settlePot({ code, hostUid: "u1" })).rejects.toThrow("INVALID_SETTLEMENT");
   });
 
   it("throws ROOM_NOT_FOUND for an unknown code", async () => {
-    await expect(settlePot({ code: "ZZZZ" })).rejects.toThrow(
+    await expect(settlePot({ code: "ZZZZ", hostUid: "u1" })).rejects.toThrow(
       "ROOM_NOT_FOUND",
     );
+  });
+
+  it("rejects a non-host caller (NOT_HOST)", async () => {
+    const code = await lobbyOfTwo();
+    await lockWagers({ code, hostUid: "u1", amount: 25 });
+    await finish(code, "u1");
+    await expect(settlePot({ code, hostUid: "u2" })).rejects.toThrow("NOT_HOST");
+    const doc = (await readGame(code)) as GameDoc;
+    expect(doc.wager?.settled).toBe(false);
   });
 });
 
@@ -198,7 +207,7 @@ describe("refundWagers", () => {
   it("returns each contribution, flips settled, leaves paidTo null", async () => {
     const code = await lobbyOfTwo();
     await lockWagers({ code, hostUid: "u1", amount: 25 }); // both at 75
-    await refundWagers({ code });
+    await refundWagers({ code, hostUid: "u1" });
     const doc = (await readGame(code)) as GameDoc;
 
     expect(doc.slots[0]!.chips).toBe(100);
@@ -210,8 +219,8 @@ describe("refundWagers", () => {
   it("is idempotent — a second refund throws ALREADY_SETTLED", async () => {
     const code = await lobbyOfTwo();
     await lockWagers({ code, hostUid: "u1", amount: 25 });
-    await refundWagers({ code });
-    await expect(refundWagers({ code })).rejects.toThrow("ALREADY_SETTLED");
+    await refundWagers({ code, hostUid: "u1" });
+    await expect(refundWagers({ code, hostUid: "u1" })).rejects.toThrow("ALREADY_SETTLED");
     const doc = (await readGame(code)) as GameDoc;
     // Not refunded twice.
     expect(doc.slots[0]!.chips).toBe(100);
@@ -219,18 +228,37 @@ describe("refundWagers", () => {
 
   it("rejects when no wager is locked", async () => {
     const code = await lobbyOfTwo();
-    await expect(refundWagers({ code })).rejects.toThrow("WAGER_NOT_LOCKED");
+    await expect(refundWagers({ code, hostUid: "u1" })).rejects.toThrow("WAGER_NOT_LOCKED");
   });
 
   it("rejects refunding a finished game (that is settlePot's job)", async () => {
     const code = await lobbyOfTwo();
     await lockWagers({ code, hostUid: "u1", amount: 25 });
     await finish(code, "u2");
-    await expect(refundWagers({ code })).rejects.toThrow("INVALID_SETTLEMENT");
+    await expect(refundWagers({ code, hostUid: "u1" })).rejects.toThrow("INVALID_SETTLEMENT");
+  });
+
+  it("rejects a non-host caller, so a losing player cannot void the pot", async () => {
+    const code = await lobbyOfTwo();
+    await lockWagers({ code, hostUid: "u1", amount: 25 });
+    await startGame({ code, hostUid: "u1" });
+
+    // u2 is about to lose and tries to escape the wager mid-game. Before the
+    // host check this succeeded, marking the pot settled; the eventual
+    // settlePot then threw ALREADY_SETTLED and the winner was paid nothing.
+    await expect(refundWagers({ code, hostUid: "u2" })).rejects.toThrow(
+      "NOT_HOST",
+    );
+
+    await finish(code, "u1");
+    await settlePot({ code, hostUid: "u1" });
+    const doc = (await readGame(code)) as GameDoc;
+    expect(doc.wager?.paidTo).toBe("u1");
+    expect(doc.slots[0]!.chips).toBe(125); // 75 left + 50 pot
   });
 
   it("throws ROOM_NOT_FOUND for an unknown code", async () => {
-    await expect(refundWagers({ code: "ZZZZ" })).rejects.toThrow(
+    await expect(refundWagers({ code: "ZZZZ", hostUid: "u1" })).rejects.toThrow(
       "ROOM_NOT_FOUND",
     );
   });
@@ -253,7 +281,7 @@ describe("roster freeze on leave", () => {
   it("releases the roster after a refund settles the pot", async () => {
     const code = await lobbyOfTwo();
     await lockWagers({ code, hostUid: "u1", amount: 25 });
-    await refundWagers({ code }); // settled = true, chips returned
+    await refundWagers({ code, hostUid: "u1" }); // settled = true, chips returned
     // Now leaving is allowed again — the pot is inert.
     await leaveGame({ code, uid: "u2" });
     const doc = (await readGame(code)) as GameDoc;

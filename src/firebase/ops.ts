@@ -355,6 +355,7 @@ export async function lockWagers(input: LockWagersInput): Promise<void> {
 
 export interface SettlePotInput {
   code: string;
+  hostUid: string;
 }
 
 /**
@@ -362,11 +363,15 @@ export interface SettlePotInput {
  * Idempotent: a second call after settlement throws `ALREADY_SETTLED`,
  * which is the double-payout guard.
  *
- * Asserts (in order): room exists, a wager is locked, not already settled,
- * status is "finished", and a winner is recorded.
+ * Host-only, mirroring `lockWagers`: the money-out paths must be no more
+ * callable than the money-in path, or any seated player could drive the pot.
+ *
+ * Asserts (in order): room exists, caller is host, a wager is locked, not
+ * already settled, status is "finished", and a winner is recorded.
  */
 export async function settlePot(input: SettlePotInput): Promise<void> {
   await updateGameTx(input.code, (g, commit) => {
+    if (g.hostUid !== input.hostUid) throw new Error("NOT_HOST");
     const pot = g.wager;
     if (pot === null) throw new Error("WAGER_NOT_LOCKED");
     if (pot.settled) throw new Error("ALREADY_SETTLED");
@@ -384,6 +389,7 @@ export async function settlePot(input: SettlePotInput): Promise<void> {
 
 export interface RefundWagersInput {
   code: string;
+  hostUid: string;
 }
 
 /**
@@ -392,11 +398,17 @@ export interface RefundWagersInput {
  * `paidTo = null`, so the same idempotency guard that protects settlePot
  * also blocks a double-refund.
  *
- * Asserts (in order): room exists, a wager is locked, not already settled,
- * and the game is NOT finished (a finished game is settlePot's job).
+ * Host-only. Without this check a losing player could void a wager they were
+ * about to lose: refunding an `in_progress` game marks the pot settled, so
+ * the eventual `settlePot` throws `ALREADY_SETTLED` and the winner is paid
+ * nothing.
+ *
+ * Asserts (in order): room exists, caller is host, a wager is locked, not
+ * already settled, and the game is NOT finished (that is settlePot's job).
  */
 export async function refundWagers(input: RefundWagersInput): Promise<void> {
   await updateGameTx(input.code, (g, commit) => {
+    if (g.hostUid !== input.hostUid) throw new Error("NOT_HOST");
     const pot = g.wager;
     if (pot === null) throw new Error("WAGER_NOT_LOCKED");
     if (pot.settled) throw new Error("ALREADY_SETTLED");

@@ -88,12 +88,30 @@ service cloud.firestore {
         return (d0 + d1 + d2 + d3 + d4 + d5) <= 1;
       }
 
+      // A turn whose deadline has lapsed may be advanced by ANY seated
+      // player. This mirrors `advanceTurn` in ops.ts and is what the play
+      // screen's 250ms auto-advance poll relies on.
+      //
+      // NOTE: `turnDeadline` is client-stamped and not yet validated by
+      // these rules, so this branch is forgeable by a hostile client. It is
+      // added because WITHOUT it the shipped turn timer is dead in
+      // production: advancing changes `current`, every non-current client's
+      // advance is denied, and a table stalled by a disconnected player
+      // deadlocks with no recovery. Pin `turnDeadline` to `request.time`
+      // during the rules hardening pass to close the forgery.
+      function turnExpired() {
+        return cur().turnDeadline != null
+            && request.time.toMillis() > cur().turnDeadline;
+      }
+
       // The caller may act for the current player if they ARE that
-      // player, or they are the host and the seat holds an NPC uid.
+      // player, they are the host and the seat holds an NPC uid, or the
+      // turn clock has run out and they are seated at the table.
       function canActForCurrentPlayer() {
         let seatUid = cur().slots[cur().current].uid;
         return seatUid == authUid()
-            || (isHost() && isNpcUid(seatUid));
+            || (isHost() && isNpcUid(seatUid))
+            || (turnExpired() && isParticipant());
       }
 
       // Immutable fields that must never change after creation.
@@ -135,9 +153,19 @@ service cloud.firestore {
       }
 
       // ── READ ──────────────────────────────────────────────────────
-      // Auth-gated: the joiner authenticates anonymously before
-      // reading the room. Blocks unauthenticated enumeration.
-      allow read: if request.auth != null;
+      // `get` is auth-gated: the joiner authenticates anonymously, then
+      // reads the room by its code before they are in `playerUids`, so we
+      // cannot require participation here.
+      //
+      // `list` is denied outright. `allow read` covers BOTH get and list,
+      // so the previous form let any anonymous client run
+      // `getDocs(collection(db,'games'))` and dump every live room —
+      // codes, player uids, display names and pots. That turned "guess a
+      // 4-character code" into a live index of every table. The client only
+      // ever reads single docs (`doc()` + `onSnapshot`), never a collection
+      // query, so denying list costs the app nothing.
+      allow get: if request.auth != null;
+      allow list: if false;
 
       // ── CREATE ────────────────────────────────────────────────────
       // Validates the initial doc shape so a malicious client cannot

@@ -76,7 +76,7 @@ describe("wager flow", () => {
       commit({ status: "finished", winner: "u2" });
     });
 
-    await settlePot({ code });
+    await settlePot({ code, hostUid: "u1" });
     const g = await get(code);
     // u2 staked 20 (now at 80) then collects the 40 pot -> 120.
     expect(g.slots[1]!.chips).toBe(STARTING_CHIPS - 20 + 40); // 120
@@ -89,7 +89,7 @@ describe("wager flow", () => {
     const code = await lobby2();
     await lockWagers({ code, hostUid: "u1", amount: 20 });
 
-    await refundWagers({ code });
+    await refundWagers({ code, hostUid: "u1" });
     const g = await get(code);
     expect(g.slots[0]!.chips).toBe(STARTING_CHIPS); // 100 restored
     expect(g.slots[1]!.chips).toBe(STARTING_CHIPS); // 100 restored
@@ -129,13 +129,13 @@ describe("wager flow", () => {
   it("rejects settlePot after a refund (ALREADY_SETTLED)", async () => {
     const code = await lobby2();
     await lockWagers({ code, hostUid: "u1", amount: 20 });
-    await refundWagers({ code });
+    await refundWagers({ code, hostUid: "u1" });
 
     // Even if the game later finishes, the pot is already settled (refunded).
     await startGame({ code, hostUid: "u1" });
     await updateGameTx(code, (_g, commit) => {
       commit({ status: "finished", winner: "u1" });
     });
-    await expect(settlePot({ code })).rejects.toThrow("ALREADY_SETTLED");
+    await expect(settlePot({ code, hostUid: "u1" })).rejects.toThrow("ALREADY_SETTLED");
   });
 });

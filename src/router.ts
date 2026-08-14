@@ -46,7 +46,17 @@ export function startRouter(options: RouterOptions): Router {
     currentScreen = next;
     const root = options.getScreenRoot(next);
     if (root) {
-      cleanup = mounts[next](root);
+      const fn = mounts[next](root);
+      // A mount may synchronously re-enter apply() (see above) and install
+      // ITS cleanup. Assigning unconditionally here would drop that handle,
+      // leaking the inner screen's subscriber and click listeners while
+      // running the wrong teardown later. Only claim the slot if we are
+      // still the active screen; otherwise tear ourselves down immediately.
+      if (currentScreen === next) {
+        cleanup = fn;
+      } else {
+        fn();
+      }
     }
   };
 

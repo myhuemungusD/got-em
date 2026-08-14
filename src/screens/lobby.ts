@@ -203,7 +203,7 @@ export function mount(root: HTMLElement): () => void {
     setStatus("");
     wagerRefundBtn.disabled = true;
     try {
-      await refundWagers({ code: g.code });
+      await refundWagers({ code: g.code, hostUid: g.hostUid });
     } catch (err) {
       setStatus(humanError(err));
     } finally {

@@ -213,6 +213,90 @@ describe("remote roll animation ordering", () => {
   });
 });
 
+describe("snapshot serialization during a roll animation", () => {
+  it("does not let a doc awaiting animation overwrite a newer doc", async () => {
+    setState({ myUid: "u1" });
+    write("ABCD", makeDoc({ status: "in_progress" }));
+
+    // Each animateRoll call parks its resolver here so the test can let the
+    // animations finish one at a time, in order.
+    const resolvers: Array<() => void> = [];
+    const animateRoll = vi.fn(
+      () =>
+        new Promise<void>((res) => {
+          resolvers.push(() => res());
+        }),
+    );
+    watchRoom("ABCD", { animateRoll });
+    await flush();
+
+    // Opponent rolls — handleDoc suspends inside animateRoll.
+    write("ABCD", makeDoc({
+      status: "in_progress",
+      current: 1,
+      lastRoll: [3, 4],
+      lastRollId: "r1",
+      lastRolledBy: "u2",
+    }));
+    await flush();
+    expect(state.isAnimatingRoll).toBe(true);
+
+    // A newer snapshot lands mid-animation: the game is over.
+    write("ABCD", makeDoc({
+      status: "finished",
+      winner: "u2",
+      current: 1,
+      lastRoll: [3, 4],
+      lastRollId: "r2",
+      lastRolledBy: "u2",
+    }));
+    await flush();
+
+    // Drain every animation the run schedules, in order.
+    for (let i = 0; i < 4 && resolvers.length > 0; i++) {
+      resolvers.shift()!();
+      await flush();
+    }
+
+    // The suspended older invocation must not resurrect the finished game.
+    expect(state.game?.status).toBe("finished");
+    expect(state.screen).toBe("gameover");
+  });
+
+  it("drops queued snapshots for a room that was left mid-animation", async () => {
+    setState({ myUid: "u1" });
+    write("ABCD", makeDoc({ status: "in_progress" }));
+
+    let resolveAnim: (() => void) | null = null;
+    const animateRoll = vi.fn(
+      () =>
+        new Promise<void>((res) => {
+          resolveAnim = () => res();
+        }),
+    );
+    watchRoom("ABCD", { animateRoll });
+    await flush();
+
+    write("ABCD", makeDoc({
+      status: "in_progress",
+      lastRoll: [2, 5],
+      lastRollId: "r1",
+      lastRolledBy: "u2",
+    }));
+    await flush();
+    expect(state.isAnimatingRoll).toBe(true);
+
+    await leaveRoom();
+    resolveAnim!();
+    await flush();
+
+    // The late snapshot must not pull the player back into the room.
+    expect(state.screen).toBe("splash");
+    expect(state.game).toBeNull();
+    expect(state.currentRoom).toBeNull();
+  });
+});
+
 describe("pendingTenSelection reset", () => {
   it("clears on a turn (current) change", async () => {
     setState({ myUid: "u1" });

@@ -29,6 +29,14 @@ let nameIdx = 0;
 
 const activeNpcs = new Set<string>();
 let pendingTimer: ReturnType<typeof setTimeout> | null = null;
+/**
+ * True while an NPC write is in flight. Without it an unrelated doc update
+ * (a player leaving, a wager change) re-enters `maybeNpcTurn` while the
+ * previous roll is still committing, schedules a second timer, and — in a
+ * phase where the same seat may legally roll again, e.g. craps point phase —
+ * issues a second roll the server happily accepts. The NPC visibly rolls twice.
+ */
+let npcActing = false;
 
 export function isNpc(uid: string | null): boolean {
   return uid !== null && uid.startsWith(NPC_UID_PREFIX);
@@ -69,6 +77,7 @@ export function clearNpcs(): void {
   }
   activeNpcs.clear();
   nameIdx = 0;
+  npcActing = false;
 }
 
 export function hasActiveNpcs(): boolean {
@@ -91,6 +100,9 @@ export function maybeNpcTurn(g: GameState): void {
   }
 
   if (g.status !== "in_progress") return;
+  // A write is still committing; its completion re-invokes us via the
+  // resulting snapshot, so returning here is not a lost wakeup.
+  if (npcActing) return;
 
   const slot = g.slots[g.current];
   if (!slot?.uid || !activeNpcs.has(slot.uid)) return;
@@ -114,9 +126,18 @@ export function maybeNpcTurn(g: GameState): void {
       maybeNpcTurn(cur);
       return;
     }
-    void executeNpcTurn(cur.code, curSlot.uid, cur).catch((err: unknown) => {
-      console.warn("[npc] turn failed:", err instanceof Error ? err.message : err);
-    });
+    npcActing = true;
+    void executeNpcTurn(cur.code, curSlot.uid, cur)
+      .catch((err: unknown) => {
+        console.warn("[npc] turn failed:", err instanceof Error ? err.message : err);
+      })
+      .finally(() => {
+        // On success the resulting snapshot re-invokes us. On failure we
+        // deliberately do NOT retry here: a persistently rejected write
+        // would busy-loop. The turn timer's auto-advance is the backstop,
+        // which is the pre-existing behavior for a failed NPC turn.
+        npcActing = false;
+      });
   }, delay);
 }
 
