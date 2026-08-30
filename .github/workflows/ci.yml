@@ -25,7 +25,7 @@ jobs:
       # The Firestore emulator is a Java process. Without this the rules
       # suite cannot run, which is why firestore.rules has been shipping
       # unverified — `npm test` deliberately excludes it.
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '21'
